@@ -30,7 +30,7 @@
 
 <div class="metric-grid">
     <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div></div>
-    <div class="metric-card"><h3>전략채용 완료</h3><div id="strategyCount" class="metric-value">-</div></div>
+    <div class="metric-card"><h3>전략채용</h3><div id="strategyCount" class="metric-value">-</div></div>
     <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div></div>
     <div class="metric-card"><h3>최단 리드타임</h3><div id="minLeadTime" class="metric-value">-</div><div id="minLeadPos" class="metric-sub">-</div></div>
     <div class="metric-card"><h3>최장 리드타임</h3><div id="maxLeadTime" class="metric-value">-</div><div id="maxLeadPos" class="metric-sub">-</div></div>
@@ -39,7 +39,7 @@
 
 <div class="chart-grid">
     <div class="card full-width">
-        <h2>월별 채용 완료 추이 (25년 12월 이후)</h2>
+        <h2>월별 채용 완료 추이</h2>
         <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
     </div>
     <div class="card full-width">
@@ -59,7 +59,7 @@
         <div class="chart-container"><canvas id="typeChart"></canvas></div>
     </div>
     <div class="card full-width">
-        <h2>채용 사유별 (신규 vs 대체)</h2>
+        <h2>채용 사유별</h2>
         <div class="chart-container"><canvas id="reasonChart"></canvas></div>
     </div>
 </div>
@@ -69,11 +69,7 @@
     const toUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=770067438&single=true&output=csv";
 
     let charts = {};
-
-    const intAxisOptions = { 
-        ticks: { stepSize: 1, precision: 0 }, 
-        beginAtZero: true 
-    };
+    const intAxisOptions = { ticks: { stepSize: 1, precision: 0 }, beginAtZero: true };
 
     function init() {
         Papa.parse(posUrl, { download: true, header: true, skipEmptyLines: true, complete: res => processPos(res.data) });
@@ -84,100 +80,95 @@
         const active = data.filter(d => String(d['상태']).trim() === '진행중');
         const done = data.filter(d => String(d['상태']).trim() === '완료');
 
+        // 1. 전략채용: 완료 건 중 공고명에 '전략' 포함 (정확한 필터링)
         const strategyCount = done.filter(d => String(d['공고명']).includes('전략')).length;
         document.getElementById('strategyCount').innerText = strategyCount + "명";
         document.getElementById('openCount').innerText = active.length + "건";
 
+        // 2. 월별 채용 완료 추이 (제목 수정 및 색상 통일)
         const monthlyCounts = { "2025-12": 0, "2026-01": 0, "2026-02": 0, "2026-03": 0 };
         done.forEach(d => {
             let dateStr = String(d['최종 합격일'] || "").trim();
             const match = dateStr.match(/(\d{4})[\.\s-]+(\d{1,2})/);
             if(match) {
-                const year = match[1];
-                const month = match[2].padStart(2, '0');
-                const key = `${year}-${month}`;
+                const key = `${match[1]}-${match[2].padStart(2, '0')}`;
                 if(monthlyCounts.hasOwnProperty(key)) monthlyCounts[key]++;
             }
         });
 
         const monthLabels = ["25년 12월", "26년 1월", "26년 2월", "26년 3월"];
-        const monthValues = [monthlyCounts["2025-12"], monthlyCounts["2026-01"], monthlyCounts["2026-02"], monthlyCounts["2026-03"]];
-        
         updateChart('monthlyChart', 'bar', monthLabels, [{
-            label: '채용 완료 인원', data: monthValues, 
-            backgroundColor: monthValues.map((v, i) => i === 1 ? '#E6221A' : '#53565A'), 
+            label: '채용 완료 인원', 
+            data: [monthlyCounts["2025-12"], monthlyCounts["2026-01"], monthlyCounts["2026-02"], monthlyCounts["2026-03"]],
+            backgroundColor: '#E6221A', // 모두 동일한 빨간색으로 통일
             borderRadius: 5
         }], { scales: { y: intAxisOptions } });
 
+        // 3. 리드타임 복구
         let leadTimes = [];
         done.forEach(d => {
             const s = new Date(String(d['오픈 날짜']).replace(/\./g, '-'));
             const e = new Date(String(d['최종 합격일']).replace(/\./g, '-'));
-            if(!isNaN(s) && !isNaN(e)) {
-                const diff = Math.round((e - s) / 86400000);
-                leadTimes.push({ title: d['공고명'], days: diff });
-            }
+            if(!isNaN(s) && !isNaN(e)) leadTimes.push({ title: d['공고명'], days: Math.round((e - s) / 86400000) });
         });
-
         if(leadTimes.length > 0) {
-            const avg = Math.round(leadTimes.reduce((a, b) => a + b.days, 0) / leadTimes.length);
             leadTimes.sort((a, b) => a.days - b.days);
-            document.getElementById('avgLeadTime').innerText = avg + "일";
+            document.getElementById('avgLeadTime').innerText = Math.round(leadTimes.reduce((a,b)=>a+b.days,0)/leadTimes.length) + "일";
             document.getElementById('minLeadTime').innerText = leadTimes[0].days + "일";
             document.getElementById('minLeadPos').innerText = leadTimes[0].title;
             document.getElementById('maxLeadTime').innerText = leadTimes[leadTimes.length-1].days + "일";
             document.getElementById('maxLeadPos').innerText = leadTimes[leadTimes.length-1].title;
         }
 
-        const categories = {};
-        done.forEach(d => {
-            const jobGroup = String(d['직군'] || "미분류").trim();
-            if(jobGroup) categories[jobGroup] = (categories[jobGroup] || 0) + 1;
-        });
-        updateChart('categoryChart', 'doughnut', Object.keys(categories), [{ data: Object.values(categories), backgroundColor: ['#E6221A', '#53565A', '#F37021', '#FFB400', '#000000'] }]);
+        // 4. 채용 사유별 (완전 새로운 로직 적용)
+        const reasonLabels = ['신규채용', '대체채용'];
+        const reasonActive = [0, 0];
+        const reasonDone = [0, 0];
 
-        renderStackChart('typeChart', active, done, '고용형태', ['정규직','계약직','파견직']);
-        renderStackChart('reasonChart', active, done, '채용사유', ['신규 채용','신규채용','대체 채용','대체채용']);
+        // 띄어쓰기 무관하게 데이터 집계
+        active.forEach(d => {
+            const val = String(d['채용사유'] || "").replace(/\s/g, '');
+            if(val.includes('신규')) reasonActive[0]++;
+            else if(val.includes('대체')) reasonActive[1]++;
+        });
+        done.forEach(d => {
+            const val = String(d['채용사유'] || "").replace(/\s/g, '');
+            if(val.includes('신규')) reasonDone[0]++;
+            else if(val.includes('대체')) reasonDone[1]++;
+        });
+
+        updateChart('reasonChart', 'bar', reasonLabels, [
+            { label: '진행중', data: reasonActive, backgroundColor: '#E6221A' },
+            { label: '완료', data: reasonDone, backgroundColor: '#53565A' }
+        ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxisOptions } } });
+
+        // 5. 기타 차트
+        const cats = {};
+        done.forEach(d => { const g = String(d['직군'] || "미분류").trim(); cats[g] = (cats[g] || 0) + 1; });
+        updateChart('categoryChart', 'doughnut', Object.keys(cats), [{ data: Object.values(cats), backgroundColor: ['#E6221A', '#53565A', '#F37021', '#FFB400', '#000000'] }]);
+        
+        const types = ['정규직', '계약직', '파견직'];
+        updateChart('typeChart', 'bar', types, [
+            { label: '진행중', data: types.map(t => active.filter(d => String(d['고용형태']).includes(t)).length), backgroundColor: '#E6221A' },
+            { label: '완료', data: types.map(t => done.filter(d => String(d['고용형태']).includes(t)).length), backgroundColor: '#53565A' }
+        ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxisOptions } } });
     }
 
     function processTO(data) {
-        let totalRemain = 0, remainLabels = [], remainValues = [], doneLabels = [], doneValues = [];
+        let totalRemain = 0, remLabels = [], remVals = [], doneLabels = [], doneVals = [];
         data.forEach(row => {
-            const orgName = String(row[0] || "").trim();
-            const cellName = String(row[1] || "").trim();
-            const doneVal = parseInt(row[3]) || 0;
-            const remainVal = parseInt(row[4]) || 0;
-            if (orgName.includes("합계")) totalRemain = remainVal;
-            else if (orgName && orgName !== "조직" && orgName !== "팀") {
-                if (orgName === cellName && (orgName.includes('팀') || orgName.includes('본부') || orgName.includes('실'))) {
-                    remainLabels.push(orgName); remainValues.push(remainVal);
-                }
-                if (cellName && cellName !== "" && cellName !== "-" && orgName !== cellName) {
-                    doneLabels.push(cellName); doneValues.push(doneVal);
-                }
+            const org = String(row[0]||"").trim(), cell = String(row[1]||"").trim();
+            const dVal = parseInt(row[3])||0, rVal = parseInt(row[4])||0;
+            if (org.includes("합계")) totalRemain = rVal;
+            else if (org && org !== "조직") {
+                if (org === cell) { remLabels.push(org); remVals.push(rVal); }
+                else if (cell && cell !== "-") { doneLabels.push(cell); doneVals.push(dVal); }
             }
         });
         document.getElementById('totalTO').innerText = totalRemain + "명";
-        updateChart('toRemainChart', 'bar', remainLabels, [{ label: '잔여 T.O', data: remainValues, backgroundColor: '#E6221A' }], { indexAxis: 'y', scales: { x: intAxisOptions } });
-        
-        const doneChartHeight = Math.max(400, doneLabels.length * 30);
-        document.getElementById('doneContainer').style.height = doneChartHeight + "px";
-        updateChart('toDoneChart', 'bar', doneLabels, [{ label: '채용완료', data: doneValues, backgroundColor: '#53565A' }], { indexAxis: 'y', scales: { x: intAxisOptions } });
-    }
-
-    function renderStackChart(id, active, done, fieldName, labels) {
-        // 유연한 매칭을 위해 원본 레이블 그룹화
-        const realLabels = labels.filter(l => !l.includes('채용') || l.length > 5 ? true : false); 
-        // 실제 차트에 표시할 레이블 (신규채용, 대체채용 정규화)
-        const displayLabels = id === 'reasonChart' ? ['신규채용', '대체채용'] : labels;
-
-        const aData = displayLabels.map(l => active.filter(d => String(d[fieldName]).trim().includes(l.replace(' ', ''))).length);
-        const dData = displayLabels.map(l => done.filter(d => String(d[fieldName]).trim().includes(l.replace(' ', ''))).length);
-        
-        updateChart(id, 'bar', displayLabels, [
-            { label: '진행중', data: aData, backgroundColor: '#E6221A' }, 
-            { label: '완료', data: dData, backgroundColor: '#53565A' }
-        ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxisOptions } } });
+        updateChart('toRemainChart', 'bar', remLabels, [{ label: '잔여 T.O', data: remVals, backgroundColor: '#E6221A' }], { indexAxis: 'y', scales: { x: intAxisOptions } });
+        document.getElementById('doneContainer').style.height = Math.max(350, doneLabels.length * 25) + "px";
+        updateChart('toDoneChart', 'bar', doneLabels, [{ label: '채용완료', data: doneVals, backgroundColor: '#53565A' }], { indexAxis: 'y', scales: { x: intAxisOptions } });
     }
 
     function updateChart(id, type, labels, datasets, extraOpts = {}) {
