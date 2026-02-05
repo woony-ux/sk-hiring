@@ -46,7 +46,7 @@
         <h2>조직 및 팀별 잔여 T.O 현황</h2>
         <div class="chart-container"><canvas id="toRemainChart"></canvas></div>
     </div>
-    <div class="card">
+    <div class="card full-width">
         <h2>셀별 채용 완료 현황</h2>
         <div id="doneContainer" class="chart-container"><canvas id="toDoneChart"></canvas></div>
     </div>
@@ -54,8 +54,14 @@
         <h2>채용 완료 직군 구성</h2>
         <div class="chart-container"><canvas id="categoryChart"></canvas></div>
     </div>
-    <div class="card"><h2>고용 형태별</h2><div class="chart-container"><canvas id="typeChart"></canvas></div></div>
-    <div class="card"><h2>채용 사유별</h2><div class="chart-container"><canvas id="reasonChart"></canvas></div></div>
+    <div class="card">
+        <h2>고용 형태별</h2>
+        <div class="chart-container"><canvas id="typeChart"></canvas></div>
+    </div>
+    <div class="card full-width">
+        <h2>채용 사유별</h2>
+        <div class="chart-container"><canvas id="reasonChart"></canvas></div>
+    </div>
 </div>
 
 <script>
@@ -73,17 +79,13 @@
         const active = data.filter(d => String(d['상태']).trim() === '진행중');
         const done = data.filter(d => String(d['상태']).trim() === '완료');
 
-        // 전략채용 인원
         const strategyCount = done.filter(d => String(d['공고명']).includes('전략')).length;
         document.getElementById('strategyCount').innerText = strategyCount + "명";
         document.getElementById('openCount').innerText = active.length + "건";
 
-        // 월별 추이 (강력한 정규식 파싱 적용)
-        const monthlyCounts = { "2025-12": 0, "2026-01": 0, "2026-02": 0, "2026-03": 0 };
-        
+        const monthCounts = { "2025-12": 0, "2026-01": 0, "2026-02": 0, "2026-03": 0 };
         done.forEach(d => {
             let dateStr = String(d['최종 합격일'] || "").trim();
-            // 숫자만 추출하여 202512 또는 20261 형식으로 변환 시도
             const match = dateStr.match(/(\d{4})[\.\s-]+(\d{1,2})/);
             if(match) {
                 const year = match[1];
@@ -94,17 +96,12 @@
         });
 
         const monthLabels = ["25년 12월", "26년 1월", "26년 2월", "26년 3월"];
-        const monthValues = [monthlyCounts["2025-12"], monthlyCounts["2026-01"], monthlyCounts["2026-02"], monthlyCounts["2026-03"]];
+        const monthValues = [monthCounts["2025-12"], monthCounts["2026-01"], monthCounts["2026-02"], monthCounts["2026-03"]];
         
-        // 막대 그래프(Bar)로 변경하여 수치를 더 명확하게 표현
         updateChart('monthlyChart', 'bar', monthLabels, [{
-            label: '채용 완료 인원',
-            data: monthValues,
-            backgroundColor: monthValues.map((v, i) => i === 1 ? '#E6221A' : '#53565A'), // 1월 강조
-            borderRadius: 5
+            label: '채용 완료 인원', data: monthValues, backgroundColor: monthValues.map((v, i) => i === 1 ? '#E6221A' : '#53565A'), borderRadius: 5
         }], { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } });
 
-        // 리드타임 카드 복구
         let leadTimes = [];
         done.forEach(d => {
             const s = new Date(String(d['오픈 날짜']).replace(/\./g, '-'));
@@ -125,7 +122,6 @@
             document.getElementById('maxLeadPos').innerText = leadTimes[leadTimes.length-1].title;
         }
 
-        // 직군 구성
         const categories = {};
         done.forEach(d => {
             const jobGroup = String(d['직군'] || "미분류").trim();
