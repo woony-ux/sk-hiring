@@ -12,15 +12,13 @@
         body { font-family: 'Noto Sans KR', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
         .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 25px; text-align: center; box-shadow: 0 4px 15px rgba(230, 34, 26, 0.2); }
         .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .metric-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border-bottom: 5px solid var(--sk-red); box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: transform 0.2s; }
-        .metric-card:hover { transform: translateY(-5px); }
-        .metric-card h3 { font-size: 0.95rem; color: #555; margin: 0; font-weight: 700; }
+        .metric-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border-bottom: 5px solid var(--sk-red); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .metric-value { font-size: 2.2rem; font-weight: 800; color: var(--sk-red); margin: 8px 0; }
-        .metric-sub { font-size: 0.8rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .metric-sub { font-size: 0.8rem; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .chart-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; }
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
         .full-width { grid-column: 1 / -1; }
-        .chart-container { position: relative; height: 350px; width: 100%; }
+        .chart-container { position: relative; height: 450px; width: 100%; }
         h2 { font-size: 1.2rem; margin-top: 0; margin-bottom: 20px; color: #222; border-left: 5px solid var(--sk-red); padding-left: 12px; }
         @media (max-width: 1000px) { .chart-grid { grid-template-columns: 1fr; } }
     </style>
@@ -28,46 +26,27 @@
 <body>
 
 <div class="header">
-    <h1 style="margin:0; font-size: 1.8rem; letter-spacing: -0.5px;">SK electlink Recruitment Real-time Dashboard</h1>
+    <h1 style="margin:0; font-size: 1.8rem;">SK electlink Recruitment Dashboard</h1>
 </div>
 
 <div class="metric-grid">
     <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div></div>
     <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div></div>
-    <div class="metric-card">
-        <h3>최단 리드타임</h3>
-        <div id="minLeadTime" class="metric-value">-</div>
-        <div id="minLeadPos" class="metric-sub">분석 중</div>
-    </div>
-    <div class="metric-card">
-        <h3>최장 리드타임</h3>
-        <div id="maxLeadTime" class="metric-value">-</div>
-        <div id="maxLeadPos" class="metric-sub">분석 중</div>
-    </div>
-    <div class="metric-card">
-        <h3>2026 잔여 T.O (합계)</h3>
-        <div id="totalTO" class="metric-value">-</div>
-        <div class="metric-sub">전사 통합 기준</div>
-    </div>
+    <div class="metric-card"><h3>최단 리드타임</h3><div id="minLeadTime" class="metric-value">-</div><div id="minLeadPos" class="metric-sub">-</div></div>
+    <div class="metric-card"><h3>최장 리드타임</h3><div id="maxLeadTime" class="metric-value">-</div><div id="maxLeadPos" class="metric-sub">-</div></div>
+    <div class="metric-card"><h3>2026 잔여 T.O</h3><div id="totalTO" class="metric-value">-</div><div class="metric-sub">전사 통합 합계</div></div>
 </div>
 
 <div class="chart-grid">
     <div class="card full-width">
-        <h2>조직별 잔여 T.O 현황</h2>
+        <h2>조직 및 팀별 잔여 T.O (상위 조직 기준)</h2>
         <div class="chart-container"><canvas id="toChart"></canvas></div>
     </div>
-    <div class="card">
-        <h2>고용 형태별 비중 (진행+완료)</h2>
-        <div class="chart-container"><canvas id="typeChart"></canvas></div>
-    </div>
-    <div class="card">
-        <h2>채용 사유별 비중 (진행+완료)</h2>
-        <div class="chart-container"><canvas id="reasonChart"></canvas></div>
-    </div>
+    <div class="card"><h2>고용 형태별</h2><div class="chart-container"><canvas id="typeChart"></canvas></div></div>
+    <div class="card"><h2>채용 사유별</h2><div class="chart-container"><canvas id="reasonChart"></canvas></div></div>
 </div>
 
 <script>
-    // 데이터 URL (담당자님 시트 기반)
     const posUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=867729802&single=true&output=csv";
     const toUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=770067438&single=true&output=csv";
 
@@ -79,11 +58,9 @@
     }
 
     function processPos(data) {
-        const rows = data.slice(1); // 제목행 제외
-        // 시트 구조: 공고명(0), 팀(1), 셀(2), 상태(4), 오픈(5), 합격일(6), 고용형태(7), 채용사유(8)
+        const rows = data.slice(1);
         const active = rows.filter(r => String(r[4]).trim() === '진행중');
         const done = rows.filter(r => String(r[4]).trim() === '완료');
-        
         document.getElementById('openCount').innerText = active.length + "건";
 
         let leadTimes = [];
@@ -111,24 +88,27 @@
 
     function processTO(data) {
         let totalVal = 0;
-        let labels = [], values = [], colors = [];
+        let labels = [], values = [];
 
         data.forEach(row => {
             const name = String(row[0]).trim();
             const toVal = parseInt(row[4]) || 0;
 
-            // 핵심: '합계' 글자가 있는 행의 5번째 데이터(E열)를 찾음
             if (name.includes("합계")) {
                 totalVal = toVal;
-            } else if (name && name !== "팀" && name !== "조직") {
-                labels.push(name);
-                values.push(toVal);
-                colors.push(name.includes('팀') ? '#E6221A' : '#F37021');
+            } 
+            // '팀' 또는 '본부'라는 글자가 포함된 행만 차트 데이터로 수집 (셀 데이터는 무시)
+            else if ((name.includes('팀') || name.includes('본부') || name.includes('실')) && !name.includes('조직')) {
+                // 중복 방지: 이미 목록에 있는 이름이면 추가하지 않음
+                if (!labels.includes(name)) {
+                    labels.push(name);
+                    values.push(toVal);
+                }
             }
         });
 
         document.getElementById('totalTO').innerText = totalVal + "명";
-        updateChart('toChart', 'bar', labels, [{ label: '잔여 T.O', data: values, backgroundColor: colors }], { indexAxis: 'y' });
+        updateChart('toChart', 'bar', labels, [{ label: '잔여 T.O', data: values, backgroundColor: '#E6221A' }], { indexAxis: 'y' });
     }
 
     function renderStackChart(id, active, done, colIdx, labels) {
@@ -136,7 +116,7 @@
         const dData = labels.map(l => done.filter(r => String(r[colIdx]).trim().includes(l)).length);
         updateChart(id, 'bar', labels, [
             { label: '진행중', data: aData, backgroundColor: '#E6221A' },
-            { label: '채용완료', data: dData, backgroundColor: '#53565A' }
+            { label: '완료', data: dData, backgroundColor: '#53565A' }
         ], { scales: { x: { stacked: true }, y: { stacked: true } } });
     }
 
