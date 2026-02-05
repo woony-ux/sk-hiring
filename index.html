@@ -9,31 +9,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --sk-red: #E6221A; --sk-orange: #F37021; }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; overflow-x: hidden; }
-        .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 1rem; border-radius: 10px; margin-bottom: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        
-        /* 대시보드 레이아웃 최적화 */
-        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .metric-card { background: white; padding: 15px; border-radius: 12px; text-align: center; border-bottom: 4px solid var(--sk-red); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .metric-card h3 { font-size: 0.9rem; color: #666; margin: 0; }
-        .metric-value { font-size: 1.8rem; font-weight: bold; color: var(--sk-red); margin: 5px 0; }
-        .metric-sub { font-size: 0.8rem; color: #888; }
-
-        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); position: relative; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 25px; text-align: center; box-shadow: 0 4px 15px rgba(230, 34, 26, 0.2); }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .metric-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border-bottom: 5px solid var(--sk-red); box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .metric-card:hover { transform: translateY(-5px); }
+        .metric-card h3 { font-size: 0.95rem; color: #555; margin: 0; font-weight: 700; }
+        .metric-value { font-size: 2.2rem; font-weight: 800; color: var(--sk-red); margin: 8px 0; }
+        .metric-sub { font-size: 0.8rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chart-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
         .full-width { grid-column: 1 / -1; }
-        
-        /* 화면 세로 길이 고정 로직 */
         .chart-container { position: relative; height: 350px; width: 100%; }
-        h2 { font-size: 1.1rem; margin-top: 0; color: #333; border-left: 4px solid var(--sk-red); padding-left: 10px; }
-        
-        @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
+        h2 { font-size: 1.2rem; margin-top: 0; margin-bottom: 20px; color: #222; border-left: 5px solid var(--sk-red); padding-left: 12px; }
+        @media (max-width: 1000px) { .chart-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h1 style="margin:0; font-size: 1.5rem;">SK electlink Recruitment Analytics</h1>
+    <h1 style="margin:0; font-size: 1.8rem; letter-spacing: -0.5px;">SK electlink Recruitment Real-time Dashboard</h1>
 </div>
 
 <div class="metric-grid">
@@ -49,7 +44,11 @@
         <div id="maxLeadTime" class="metric-value">-</div>
         <div id="maxLeadPos" class="metric-sub">분석 중</div>
     </div>
-    <div class="metric-card"><h3>2026 전체 잔여 T.O</h3><div id="totalTO" class="metric-value">-</div></div>
+    <div class="metric-card">
+        <h3>2026 잔여 T.O (합계)</h3>
+        <div id="totalTO" class="metric-value">-</div>
+        <div class="metric-sub">전사 통합 기준</div>
+    </div>
 </div>
 
 <div class="chart-grid">
@@ -58,45 +57,47 @@
         <div class="chart-container"><canvas id="toChart"></canvas></div>
     </div>
     <div class="card">
-        <h2>고용 형태별 비중</h2>
+        <h2>고용 형태별 비중 (진행+완료)</h2>
         <div class="chart-container"><canvas id="typeChart"></canvas></div>
     </div>
     <div class="card">
-        <h2>채용 사유별 비중</h2>
+        <h2>채용 사유별 비중 (진행+완료)</h2>
         <div class="chart-container"><canvas id="reasonChart"></canvas></div>
     </div>
 </div>
 
 <script>
+    // 데이터 URL (담당자님 시트 기반)
     const posUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=867729802&single=true&output=csv";
     const toUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=770067438&single=true&output=csv";
 
-    // 차트 객체 저장 변수 (중복 렌더링 방지 -> 성능 최적화)
     let charts = {};
 
     function init() {
-        Papa.parse(posUrl, { download: true, header: true, skipEmptyLines: true, complete: res => processPos(res.data) });
-        Papa.parse(toUrl, { download: true, header: true, skipEmptyLines: true, complete: res => processTO(res.data) });
+        Papa.parse(posUrl, { download: true, header: false, skipEmptyLines: true, complete: res => processPos(res.data) });
+        Papa.parse(toUrl, { download: true, header: false, skipEmptyLines: true, complete: res => processTO(res.data) });
     }
 
     function processPos(data) {
-        const active = data.filter(d => String(d['상태']).trim() === '진행중');
-        const done = data.filter(d => String(d['상태']).trim() === '완료');
+        const rows = data.slice(1); // 제목행 제외
+        // 시트 구조: 공고명(0), 팀(1), 셀(2), 상태(4), 오픈(5), 합격일(6), 고용형태(7), 채용사유(8)
+        const active = rows.filter(r => String(r[4]).trim() === '진행중');
+        const done = rows.filter(r => String(r[4]).trim() === '완료');
+        
         document.getElementById('openCount').innerText = active.length + "건";
 
         let leadTimes = [];
-        done.forEach(p => {
-            const s = new Date(p['오픈 날짜']), e = new Date(p['최종 합격일']);
+        done.forEach(r => {
+            const s = new Date(r[5].replace(/\./g, '-')), e = new Date(r[6].replace(/\./g, '-'));
             if(!isNaN(s) && !isNaN(e)) {
                 const diff = Math.round((e - s) / (1000 * 60 * 60 * 24));
-                leadTimes.push({ title: p['공고명'] || p['포지션명'], days: diff });
+                leadTimes.push({ title: r[0], days: diff });
             }
         });
 
         if(leadTimes.length > 0) {
             const avg = Math.round(leadTimes.reduce((a, b) => a + b.days, 0) / leadTimes.length);
             leadTimes.sort((a, b) => a.days - b.days);
-            
             document.getElementById('avgLeadTime').innerText = avg + "일";
             document.getElementById('minLeadTime').innerText = leadTimes[0].days + "일";
             document.getElementById('minLeadPos').innerText = leadTimes[0].title;
@@ -104,28 +105,35 @@
             document.getElementById('maxLeadPos').innerText = leadTimes[leadTimes.length-1].title;
         }
 
-        renderStackChart('typeChart', active, done, '고용형태', ['정규직','계약직','파견직','용역직']);
-        renderStackChart('reasonChart', active, done, '채용사유', ['신규채용','대체채용']);
+        renderStackChart('typeChart', active, done, 7, ['정규직','계약직','파견직']);
+        renderStackChart('reasonChart', active, done, 8, ['신규 채용','대체 채용']);
     }
 
     function processTO(data) {
-        let labels = [], values = [], colors = [], total = 0;
+        let totalVal = 0;
+        let labels = [], values = [], colors = [];
+
         data.forEach(row => {
-            const rowArr = Object.values(row);
-            const name = rowArr[0], val = parseInt(rowArr[4]) || 0;
-            if(name && !isNaN(val)) {
-                labels.push(name); values.push(val);
-                if(name.includes('팀') || name.includes('본부')) { total += val; colors.push('#E6221A'); }
-                else colors.push('#F37021');
+            const name = String(row[0]).trim();
+            const toVal = parseInt(row[4]) || 0;
+
+            // 핵심: '합계' 글자가 있는 행의 5번째 데이터(E열)를 찾음
+            if (name.includes("합계")) {
+                totalVal = toVal;
+            } else if (name && name !== "팀" && name !== "조직") {
+                labels.push(name);
+                values.push(toVal);
+                colors.push(name.includes('팀') ? '#E6221A' : '#F37021');
             }
         });
-        document.getElementById('totalTO').innerText = total + "명";
+
+        document.getElementById('totalTO').innerText = totalVal + "명";
         updateChart('toChart', 'bar', labels, [{ label: '잔여 T.O', data: values, backgroundColor: colors }], { indexAxis: 'y' });
     }
 
-    function renderStackChart(id, active, done, field, labels) {
-        const aData = labels.map(l => active.filter(d => String(d[field]).trim() === l).length);
-        const dData = labels.map(l => done.filter(d => String(d[field]).trim() === l).length);
+    function renderStackChart(id, active, done, colIdx, labels) {
+        const aData = labels.map(l => active.filter(r => String(r[colIdx]).trim().includes(l)).length);
+        const dData = labels.map(l => done.filter(r => String(r[colIdx]).trim().includes(l)).length);
         updateChart(id, 'bar', labels, [
             { label: '진행중', data: aData, backgroundColor: '#E6221A' },
             { label: '채용완료', data: dData, backgroundColor: '#53565A' }
@@ -133,7 +141,7 @@
     }
 
     function updateChart(id, type, labels, datasets, extraOpts = {}) {
-        if(charts[id]) charts[id].destroy(); // 기존 차트 파기 (메모리 누수 방지)
+        if(charts[id]) charts[id].destroy();
         charts[id] = new Chart(document.getElementById(id), {
             type: type,
             data: { labels: labels, datasets: datasets },
