@@ -40,22 +40,18 @@
         <h2>월별 채용 완료 추이 (25년 12월 이후)</h2>
         <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
     </div>
-
     <div class="card full-width">
         <h2>조직 및 팀별 잔여 T.O 현황</h2>
         <div class="chart-container"><canvas id="toRemainChart"></canvas></div>
     </div>
-
     <div class="card">
         <h2>셀별 채용 완료 현황</h2>
         <div id="doneContainer" class="chart-container"><canvas id="toDoneChart"></canvas></div>
     </div>
-
     <div class="card">
         <h2>채용 완료 직군 구성 (L열 기준)</h2>
         <div class="chart-container"><canvas id="categoryChart"></canvas></div>
     </div>
-
     <div class="card"><h2>고용 형태별</h2><div class="chart-container"><canvas id="typeChart"></canvas></div></div>
     <div class="card"><h2>채용 사유별</h2><div class="chart-container"><canvas id="reasonChart"></canvas></div></div>
 </div>
@@ -67,80 +63,85 @@
     let charts = {};
 
     function init() {
-        Papa.parse(posUrl, { download: true, header: false, skipEmptyLines: true, complete: res => processPos(res.data) });
+        Papa.parse(posUrl, { download: true, header: true, skipEmptyLines: true, complete: res => processPos(res.data) });
         Papa.parse(toUrl, { download: true, header: false, skipEmptyLines: true, complete: res => processTO(res.data) });
     }
 
     function processPos(data) {
-        const rows = data.slice(1);
-        const active = rows.filter(r => String(r[4]).trim() === '진행중');
-        const done = rows.filter(r => String(r[4]).trim() === '완료');
-        
-        const strategyCount = rows.filter(r => String(r[0]).includes('전략') && String(r[4]).trim() === '완료').length;
+        // '진행중' 및 '완료' 상태 필터링 (헤더 모드이므로 이름을 직접 사용)
+        const active = data.filter(d => String(d['상태']).trim() === '진행중');
+        const done = data.filter(d => String(d['상태']).trim() === '완료');
+
+        // 1. 전략채용 카운트
+        const strategyCount = done.filter(d => String(d['공고명']).includes('전략')).length;
         document.getElementById('strategyCount').innerText = strategyCount + "명";
         document.getElementById('openCount').innerText = active.length + "건";
 
-        // 1. 월별 채용 추이 (25년 12월을 가장 앞으로)
-        const monthlyCounts = { "25.12": 0, "26.01": 0, "26.02": 0, "26.03": 0 };
-        done.forEach(r => {
-            if(r[6]) { // G열 최종합격일
-                const dateParts = r[6].split('.'); 
-                if(dateParts.length >= 2) {
-                    const key = dateParts[0].trim().slice(-2) + "." + dateParts[1].trim().padStart(2, '0');
-                    if(monthlyCounts.hasOwnProperty(key)) monthlyCounts[key]++;
+        // 2. 월별 채용 추이 (정밀 로직)
+        const monthCounts = { "2025.12": 0, "2026.1": 0, "2026.2": 0, "2026.3": 0 };
+        
+        done.forEach(d => {
+            const dateStr = d['최종 합격일'] || "";
+            if(dateStr.includes('.')) {
+                const parts = dateStr.split('.');
+                const year = parts[0].trim();
+                const month = parseInt(parts[1].trim());
+                const key = `${year}.${month}`;
+                if(monthCounts.hasOwnProperty(key)) {
+                    monthCounts[key]++;
                 }
             }
         });
-        const monthLabels = ["25년 12월", "26년 1월", "26년 2월", "26년 3월"];
-        updateChart('monthlyChart', 'line', monthLabels, [{ label: '완료 인원', data: Object.values(monthlyCounts), borderColor: '#E6221A', backgroundColor: 'rgba(230, 34, 26, 0.1)', fill: true, tension: 0.3 }]);
 
-        // 2. 직군별 구성 (L열: index 11)
+        const monthLabels = ["25년 12월", "26년 1월", "26년 2월", "26년 3월"];
+        const monthValues = [monthCounts["2025.12"], monthCounts["2026.1"], monthCounts["2026.2"], monthCounts["2026.3"]];
+        
+        updateChart('monthlyChart', 'line', monthLabels, [{
+            label: '채용 완료 인원',
+            data: monthValues,
+            borderColor: '#E6221A',
+            backgroundColor: 'rgba(230, 34, 26, 0.1)',
+            fill: true,
+            pointRadius: 5,
+            tension: 0.2
+        }]);
+
+        // 3. 직군별 구성 (L열 -> PapaParse header:true 모드에서는 열 이름 "직군" 사용)
         const categories = {};
-        done.forEach(r => {
-            const jobGroup = String(r[11] || "미분류").trim();
-            if(jobGroup && jobGroup !== "직군") {
-                categories[jobGroup] = (categories[jobGroup] || 0) + 1;
-            }
+        done.forEach(d => {
+            const jobGroup = String(d['직군'] || "미분류").trim();
+            if(jobGroup) categories[jobGroup] = (categories[jobGroup] || 0) + 1;
         });
         updateChart('categoryChart', 'doughnut', Object.keys(categories), [{ data: Object.values(categories), backgroundColor: ['#E6221A', '#53565A', '#F37021', '#FFB400', '#000000'] }]);
 
-        // 리드타임
+        // 4. 리드타임
         let leadTimes = [];
-        done.forEach(r => {
-            if(r[5] && r[6]) {
-                const s = new Date(r[5].replace(/\./g, '-')), e = new Date(r[6].replace(/\./g, '-'));
-                if(!isNaN(s) && !isNaN(e)) leadTimes.push(Math.round((e - s) / 86400000));
-            }
+        done.forEach(d => {
+            const s = new Date(String(d['오픈 날짜']).replace(/\./g, '-'));
+            const e = new Date(String(d['최종 합격일']).replace(/\./g, '-'));
+            if(!isNaN(s) && !isNaN(e)) leadTimes.push(Math.round((e - s) / 86400000));
         });
         if(leadTimes.length > 0) document.getElementById('avgLeadTime').innerText = Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) + "일";
 
-        renderStackChart('typeChart', active, done, 7, ['정규직','계약직','파견직']);
-        renderStackChart('reasonChart', active, done, 8, ['신규 채용','대체 채용']);
+        // 고용형태 및 사유
+        renderStackChart('typeChart', active, done, '고용형태', ['정규직','계약직','파견직']);
+        renderStackChart('reasonChart', active, done, '채용사유', ['신규 채용','대체 채용']);
     }
 
     function processTO(data) {
-        let totalRemain = 0;
-        let remainLabels = [], remainValues = [];
-        let doneLabels = [], doneValues = [];
-
+        let totalRemain = 0, remainLabels = [], remainValues = [], doneLabels = [], doneValues = [];
         data.forEach(row => {
             const orgName = String(row[0] || "").trim();
             const cellName = String(row[1] || "").trim();
             const doneVal = parseInt(row[3]) || 0;
             const remainVal = parseInt(row[4]) || 0;
-
-            if (orgName.includes("합계")) {
-                totalRemain = remainVal;
-            } else if (orgName && orgName !== "조직" && orgName !== "팀") {
-                // 상위 조직 잔여 TO (A=B인 노란색 행 기준)
+            if (orgName.includes("합계")) totalRemain = remainVal;
+            else if (orgName && orgName !== "조직" && orgName !== "팀") {
                 if (orgName === cellName && (orgName.includes('팀') || orgName.includes('본부') || orgName.includes('실'))) {
-                    remainLabels.push(orgName);
-                    remainValues.push(remainVal);
+                    remainLabels.push(orgName); remainValues.push(remainVal);
                 }
-                // 셀별 완료 (B열 고유 이름 행)
                 if (cellName && cellName !== "" && cellName !== "-" && orgName !== cellName) {
-                    doneLabels.push(cellName);
-                    doneValues.push(doneVal);
+                    doneLabels.push(cellName); doneValues.push(doneVal);
                 }
             }
         });
@@ -149,9 +150,9 @@
         updateChart('toDoneChart', 'bar', doneLabels, [{ label: '채용완료', data: doneValues, backgroundColor: '#53565A' }], { indexAxis: 'y' });
     }
 
-    function renderStackChart(id, active, done, colIdx, labels) {
-        const aData = labels.map(l => active.filter(r => String(r[colIdx]).trim().includes(l)).length);
-        const dData = labels.map(l => done.filter(r => String(r[colIdx]).trim().includes(l)).length);
+    function renderStackChart(id, active, done, fieldName, labels) {
+        const aData = labels.map(l => active.filter(d => String(d[fieldName]).trim().includes(l)).length);
+        const dData = labels.map(l => done.filter(d => String(d[fieldName]).trim().includes(l)).length);
         updateChart(id, 'bar', labels, [{ label: '진행중', data: aData, backgroundColor: '#E6221A' }, { label: '완료', data: dData, backgroundColor: '#53565A' }], { scales: { x: { stacked: true }, y: { stacked: true } } });
     }
 
