@@ -14,7 +14,7 @@
         .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
         .metric-card { background: white; padding: 15px; border-radius: 12px; text-align: center; border-bottom: 5px solid var(--sk-red); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .metric-value { font-size: 1.6rem; font-weight: bold; color: var(--sk-red); margin: 5px 0; }
-        .metric-sub { font-size: 0.7rem; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+        .metric-sub { font-size: 0.7rem; color: #888; display: block; }
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
         .full-width { grid-column: 1 / -1; }
@@ -22,8 +22,8 @@
         h2 { font-size: 1rem; margin-top: 0; color: #333; border-left: 4px solid var(--sk-red); padding-left: 10px; margin-bottom: 20px; }
         .pos-list-full { list-style: none; padding: 0; margin: 0; }
         .pos-item-full { background: #fff; padding: 12px 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 8px; display: flex; align-items: center; font-size: 0.95rem; }
-        .pos-item-full a { text-decoration: none; color: #0056b3; font-weight: 500; cursor: pointer; }
-        .pos-item-full a:hover { text-decoration: underline; color: var(--sk-red); }
+        .pos-item-full a { text-decoration: none; color: #0056b3; font-weight: 500; cursor: pointer; display: block; width: 100%; }
+        .pos-item-full a:hover { color: var(--sk-red); text-decoration: underline; }
         .pos-item-full::before { content: '🚀'; margin-right: 12px; }
     </style>
 </head>
@@ -77,22 +77,18 @@
 
         document.getElementById('openCount').innerText = active.length + "건";
         
-        // --- 링크 추출 로직 개선 ---
+        // --- M열(12번 인덱스) 링크 데이터 적용 ---
         document.getElementById('positionListFull').innerHTML = active.map(r => {
             const title = r[0];
-            // 데이터 전체 행(r)에서 URL 패턴이 있는 요소를 찾아 링크로 사용
-            let foundLink = "#";
-            for (let cell of r) {
-                const urlMatch = String(cell).match(/https?:\/\/[^\s"']+/g);
-                if (urlMatch) {
-                    foundLink = urlMatch[0];
-                    break;
-                }
+            const foundLink = String(r[12] || "").trim(); // M열은 0부터 시작할 때 12번째 인덱스입니다.
+
+            if(!foundLink || !foundLink.startsWith("http")) {
+                return `<div class="pos-item-full"><span>${title}</span></div>`;
             }
+
             return `<div class="pos-item-full"><a href="${foundLink}" target="_blank">${title}</a></div>`;
         }).join('');
 
-        // 월별 추이 (기존 로직 유지)
         const months = { "2025-12": 0, "2026-01": 0, "2026-02": 0 };
         done.forEach(r => {
             const m = String(r[6]).match(/(\d{4})[\.\s-]+(\d{1,2})/);
@@ -103,7 +99,6 @@
         });
         updateChart('monthlyChart', 'bar', ["25년 12월", "26년 1월", "26년 2월"], [{ label: '인원', data: Object.values(months), backgroundColor: '#E6221A' }], { scales: { y: intAxis } });
 
-        // 리드타임 (기존 유지)
         let lt = [];
         done.forEach(r => {
             const s = new Date(String(r[5]).replace(/\./g, '-')), e = new Date(String(r[6]).replace(/\./g, '-'));
@@ -118,14 +113,12 @@
             document.getElementById('maxLeadPos').innerText = lt[lt.length-1].title;
         }
 
-        // 직군 구성 (색상 강조: Purple 포함)
         const cats = {}; done.forEach(r => { const g = String(r[11] || "미분류").trim(); cats[g] = (cats[g] || 0) + 1; });
         updateChart('categoryChart', 'doughnut', Object.keys(cats), [{ 
             data: Object.values(cats), 
             backgroundColor: ['#E6221A', '#7B42FF', '#F37021', '#53565A', '#00C73C', '#248AF9'] 
         }]);
 
-        // 채용 사유 및 고용 형태 (기존 유지)
         const rStats = { "신규": { active: 0, done: 0 }, "대체": { active: 0, done: 0 } };
         rows.forEach(r => {
             const reason = String(r[8] || ""), status = String(r[4]).trim();
@@ -135,10 +128,16 @@
                 else if(status === "완료") rStats[key].done++;
             }
         });
-        updateChart('reasonChart', 'bar', ["신규채용", "대체채용"], [{ label: '오픈 공고', data: [rStats["신규"].active, rStats["대체"].active], backgroundColor: '#E6221A' }, { label: '채용 완료', data: [rStats["신규"].done, rStats["대체"].done], backgroundColor: '#53565A' }], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
+        updateChart('reasonChart', 'bar', ["신규채용", "대체채용"], [
+            { label: '오픈 공고', data: [rStats["신규"].active, rStats["대체"].active], backgroundColor: '#E6221A' },
+            { label: '채용 완료', data: [rStats["신규"].done, rStats["대체"].done], backgroundColor: '#53565A' }
+        ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
 
         const types = ['정규직', '계약직', '파견직'];
-        updateChart('typeChart', 'bar', types, [{ label: '진행중', data: types.map(t => active.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#E6221A' }, { label: '완료', data: types.map(t => done.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#53565A' }], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
+        updateChart('typeChart', 'bar', types, [
+            { label: '진행중', data: types.map(t => active.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#E6221A' },
+            { label: '완료', data: types.map(t => done.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#53565A' }
+        ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
     }
 
     function processTO(data) {
