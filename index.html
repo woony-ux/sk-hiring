@@ -59,7 +59,7 @@
         <div class="chart-container"><canvas id="typeChart"></canvas></div>
     </div>
     <div class="card full-width">
-        <h2>채용 사유별</h2>
+        <h2>채용 사유별 (신규 vs 대체)</h2>
         <div class="chart-container"><canvas id="reasonChart"></canvas></div>
     </div>
 </div>
@@ -80,12 +80,12 @@
         const active = data.filter(d => String(d['상태']).trim() === '진행중');
         const done = data.filter(d => String(d['상태']).trim() === '완료');
 
-        // 1. 전략채용: 완료 건 중 공고명에 '전략' 포함 (정확한 필터링)
+        // 1. 전략채용 인원
         const strategyCount = done.filter(d => String(d['공고명']).includes('전략')).length;
         document.getElementById('strategyCount').innerText = strategyCount + "명";
         document.getElementById('openCount').innerText = active.length + "건";
 
-        // 2. 월별 채용 완료 추이 (제목 수정 및 색상 통일)
+        // 2. 월별 채용 완료 추이
         const monthlyCounts = { "2025-12": 0, "2026-01": 0, "2026-02": 0, "2026-03": 0 };
         done.forEach(d => {
             let dateStr = String(d['최종 합격일'] || "").trim();
@@ -95,16 +95,13 @@
                 if(monthlyCounts.hasOwnProperty(key)) monthlyCounts[key]++;
             }
         });
-
-        const monthLabels = ["25년 12월", "26년 1월", "26년 2월", "26년 3월"];
-        updateChart('monthlyChart', 'bar', monthLabels, [{
+        updateChart('monthlyChart', 'bar', ["25년 12월", "26년 1월", "26년 2월", "26년 3월"], [{
             label: '채용 완료 인원', 
             data: [monthlyCounts["2025-12"], monthlyCounts["2026-01"], monthlyCounts["2026-02"], monthlyCounts["2026-03"]],
-            backgroundColor: '#E6221A', // 모두 동일한 빨간색으로 통일
-            borderRadius: 5
+            backgroundColor: '#E6221A', borderRadius: 5
         }], { scales: { y: intAxisOptions } });
 
-        // 3. 리드타임 복구
+        // 3. 리드타임
         let leadTimes = [];
         done.forEach(d => {
             const s = new Date(String(d['오픈 날짜']).replace(/\./g, '-'));
@@ -120,29 +117,31 @@
             document.getElementById('maxLeadPos').innerText = leadTimes[leadTimes.length-1].title;
         }
 
-        // 4. 채용 사유별 (완전 새로운 로직 적용)
-        const reasonLabels = ['신규채용', '대체채용'];
-        const reasonActive = [0, 0];
-        const reasonDone = [0, 0];
+        // 4. 채용 사유별 (신규/대체별 진행 vs 완료)
+        const reasonData = { 
+            "신규채용": { active: 0, done: 0 }, 
+            "대체채용": { active: 0, done: 0 } 
+        };
 
-        // 띄어쓰기 무관하게 데이터 집계
-        active.forEach(d => {
-            const val = String(d['채용사유'] || "").replace(/\s/g, '');
-            if(val.includes('신규')) reasonActive[0]++;
-            else if(val.includes('대체')) reasonActive[1]++;
-        });
-        done.forEach(d => {
-            const val = String(d['채용사유'] || "").replace(/\s/g, '');
-            if(val.includes('신규')) reasonDone[0]++;
-            else if(val.includes('대체')) reasonDone[1]++;
+        data.forEach(d => {
+            const reason = String(d['채용사유'] || "").replace(/\s/g, ''); // 공백제거
+            const status = String(d['상태']).trim();
+            let key = "";
+            if(reason.includes("신규")) key = "신규채용";
+            else if(reason.includes("대체")) key = "대체채용";
+
+            if(key) {
+                if(status === "진행중") reasonData[key].active++;
+                else if(status === "완료") reasonData[key].done++;
+            }
         });
 
-        updateChart('reasonChart', 'bar', reasonLabels, [
-            { label: '진행중', data: reasonActive, backgroundColor: '#E6221A' },
-            { label: '완료', data: reasonDone, backgroundColor: '#53565A' }
+        updateChart('reasonChart', 'bar', ["신규채용", "대체채용"], [
+            { label: '진행중', data: [reasonData["신규채용"].active, reasonData["대체채용"].active], backgroundColor: '#E6221A' },
+            { label: '완료', data: [reasonData["신규채용"].done, reasonData["대체채용"].done], backgroundColor: '#53565A' }
         ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxisOptions } } });
 
-        // 5. 기타 차트
+        // 5. 기타 구성
         const cats = {};
         done.forEach(d => { const g = String(d['직군'] || "미분류").trim(); cats[g] = (cats[g] || 0) + 1; });
         updateChart('categoryChart', 'doughnut', Object.keys(cats), [{ data: Object.values(cats), backgroundColor: ['#E6221A', '#53565A', '#F37021', '#FFB400', '#000000'] }]);
@@ -155,20 +154,20 @@
     }
 
     function processTO(data) {
-        let totalRemain = 0, remLabels = [], remVals = [], doneLabels = [], doneVals = [];
+        let totalRemain = 0, remLabels = [], remVals = [], doneLabels = [], doneValues = [];
         data.forEach(row => {
             const org = String(row[0]||"").trim(), cell = String(row[1]||"").trim();
             const dVal = parseInt(row[3])||0, rVal = parseInt(row[4])||0;
             if (org.includes("합계")) totalRemain = rVal;
             else if (org && org !== "조직") {
                 if (org === cell) { remLabels.push(org); remVals.push(rVal); }
-                else if (cell && cell !== "-") { doneLabels.push(cell); doneVals.push(dVal); }
+                else if (cell && cell !== "-") { doneLabels.push(cell); doneValues.push(dVal); }
             }
         });
         document.getElementById('totalTO').innerText = totalRemain + "명";
         updateChart('toRemainChart', 'bar', remLabels, [{ label: '잔여 T.O', data: remVals, backgroundColor: '#E6221A' }], { indexAxis: 'y', scales: { x: intAxisOptions } });
         document.getElementById('doneContainer').style.height = Math.max(350, doneLabels.length * 25) + "px";
-        updateChart('toDoneChart', 'bar', doneLabels, [{ label: '채용완료', data: doneVals, backgroundColor: '#53565A' }], { indexAxis: 'y', scales: { x: intAxisOptions } });
+        updateChart('toDoneChart', 'bar', doneLabels, [{ label: '채용완료', data: doneValues, backgroundColor: '#53565A' }], { indexAxis: 'y', scales: { x: intAxisOptions } });
     }
 
     function updateChart(id, type, labels, datasets, extraOpts = {}) {
