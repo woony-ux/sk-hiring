@@ -20,9 +20,8 @@
         .full-width { grid-column: 1 / -1; }
         .chart-container { position: relative; min-height: 350px; width: 100%; }
         h2 { font-size: 1rem; margin-top: 0; color: #333; border-left: 4px solid var(--sk-red); padding-left: 10px; margin-bottom: 20px; }
-        /* 최하단 진행중 포지션 리스트 */
         .pos-list-full { list-style: none; padding: 0; margin: 0; }
-        .pos-item-full { background: #fff; padding: 12px 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 8px; display: flex; align-items: center; font-size: 0.95rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .pos-item-full { background: #fff; padding: 12px 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 8px; display: flex; align-items: center; font-size: 0.95rem; }
         .pos-item-full::before { content: '🚀'; margin-right: 12px; }
     </style>
 </head>
@@ -61,39 +60,53 @@
     const intAxis = { ticks: { stepSize: 1, precision: 0 }, beginAtZero: true };
 
     function init() {
-        Papa.parse(posUrl, { download: true, header: true, skipEmptyLines: true, complete: res => processPos(res.data) });
+        Papa.parse(posUrl, { download: true, header: false, skipEmptyLines: true, complete: res => processPos(res.data) });
         Papa.parse(toUrl, { download: true, header: false, skipEmptyLines: true, complete: res => processTO(res.data) });
     }
 
     function processPos(data) {
-        const active = data.filter(d => String(d['상태']).trim() === '진행중');
-        const done = data.filter(d => String(d['상태']).trim() === '완료');
-
-        // 1. 전략채용 (표 기반 카운트: 공고명에 전략이 포함된 모든 행)
-        const stratData = data.filter(d => String(d['공고명']).includes('전략'));
-        document.getElementById('strategyCount').innerText = stratData.length + "건";
-        document.getElementById('openCount').innerText = active.length + "건";
-
-        // 2. 최하단 리스트 (한 줄에 하나씩)
-        document.getElementById('positionListFull').innerHTML = active.map(d => `<div class="pos-item-full">${d['공고명']}</div>`).join('');
-
-        // 3. 월별 추이 (1월 5명 보정)
-        const months = { "2025-12": 0, "2026-01": 0, "2026-02": 0 };
-        done.forEach(d => {
-            const m = String(d['최종 합격일']).match(/(\d{4})[\.\s-]+(\d{1,2})/);
-            if(m) {
-                const key = `${m[1]}-${m[2].padStart(2, '0')}`;
-                if(months.hasOwnProperty(key)) months[key]++;
+        // 행 번호 기반 추출 (A열=0, B열=1...)
+        const rows = data.slice(1);
+        
+        // --- [핵심] 전략채용 표 인원 직접 카운트 ---
+        let strategyRowsCount = 0;
+        let isStrategySection = false;
+        
+        data.forEach(row => {
+            const cellValue = String(row[0] || "").trim();
+            // 시트 어디서든 '전략채용'이라는 텍스트가 나오면 그 다음부터 카운트 시작
+            if (cellValue.includes("전략채용")) {
+                isStrategySection = true;
+                return;
+            }
+            // 전략채용 섹션 안에서 내용이 있는 행만 카운트 (합계 행 등 제외 조건)
+            if (isStrategySection && cellValue && !cellValue.includes("합계") && !cellValue.includes("공고명")) {
+                strategyRowsCount++;
             }
         });
-        updateChart('monthlyChart', 'bar', ["25년 12월", "26년 1월", "26년 2월"], [{ label: '인원', data: Object.values(months), backgroundColor: '#E6221A' }], { scales: { y: intAxis } });
+        document.getElementById('strategyCount').innerText = strategyRowsCount + "건";
+        // ----------------------------------------
 
-        // 4. 리드타임 상세 복구
+        const active = rows.filter(r => String(r[4]).trim() === '진행중');
+        const done = rows.filter(r => String(r[4]).trim() === '완료');
+
+        document.getElementById('openCount').innerText = active.length + "건";
+        document.getElementById('positionListFull').innerHTML = active.map(r => `<div class="pos-item-full">${r[0]}</div>`).join('');
+
+        const monthly = { "2025-12": 0, "2026-01": 0, "2026-02": 0 };
+        done.forEach(r => {
+            const m = String(r[6]).match(/(\d{4})[\.\s-]+(\d{1,2})/);
+            if(m) {
+                const key = `${m[1]}-${m[2].padStart(2, '0')}`;
+                if(monthly.hasOwnProperty(key)) monthly[key]++;
+            }
+        });
+        updateChart('monthlyChart', 'bar', ["25년 12월", "26년 1월", "26년 2월"], [{ label: '인원', data: Object.values(monthly), backgroundColor: '#E6221A' }], { scales: { y: intAxis } });
+
         let lt = [];
-        done.forEach(d => {
-            const s = new Date(String(d['오픈 날짜']).replace(/\./g, '-'));
-            const e = new Date(String(d['최종 합격일']).replace(/\./g, '-'));
-            if(!isNaN(s) && !isNaN(e)) lt.push({ title: d['공고명'], days: Math.round((e-s)/86400000) });
+        done.forEach(r => {
+            const s = new Date(String(r[5]).replace(/\./g, '-')), e = new Date(String(r[6]).replace(/\./g, '-'));
+            if(!isNaN(s) && !isNaN(e)) lt.push({ title: r[0], days: Math.round((e-s)/86400000) });
         });
         if(lt.length > 0) {
             lt.sort((a,b) => a.days - b.days);
@@ -104,15 +117,13 @@
             document.getElementById('maxLeadPos').innerText = lt[lt.length-1].title;
         }
 
-        // 5. 채용 사유별 (신규/대체별 오픈 vs 완료)
         const rStats = { "신규": { active: 0, done: 0 }, "대체": { active: 0, done: 0 } };
-        data.forEach(d => {
-            const r = String(d['채용사유'] || "");
-            const s = String(d['상태']).trim();
-            let key = r.includes("신규") ? "신규" : (r.includes("대체") ? "대체" : "");
+        rows.forEach(r => {
+            const reason = String(r[8] || ""), status = String(r[4]).trim();
+            let key = reason.includes("신규") ? "신규" : (reason.includes("대체") ? "대체" : "");
             if(key) {
-                if(s === "진행중") rStats[key].active++;
-                else if(s === "완료") rStats[key].done++;
+                if(status === "진행중") rStats[key].active++;
+                else if(status === "완료") rStats[key].done++;
             }
         });
         updateChart('reasonChart', 'bar', ["신규채용", "대체채용"], [
@@ -120,14 +131,13 @@
             { label: '채용 완료', data: [rStats["신규"].done, rStats["대체"].done], backgroundColor: '#53565A' }
         ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
 
-        // 6. 직군 및 고용형태
-        const cats = {}; done.forEach(d => { const g = String(d['직군'] || "미분류").trim(); cats[g] = (cats[g] || 0) + 1; });
+        const cats = {}; done.forEach(r => { const g = String(r[11] || "미분류").trim(); cats[g] = (cats[g] || 0) + 1; });
         updateChart('categoryChart', 'doughnut', Object.keys(cats), [{ data: Object.values(cats), backgroundColor: ['#E6221A', '#53565A', '#F37021'] }]);
         
         const types = ['정규직', '계약직', '파견직'];
         updateChart('typeChart', 'bar', types, [
-            { label: '진행중', data: types.map(t => active.filter(d => String(d['고용형태']).includes(t)).length), backgroundColor: '#E6221A' },
-            { label: '완료', data: types.map(t => done.filter(d => String(d['고용형태']).includes(t)).length), backgroundColor: '#53565A' }
+            { label: '진행중', data: types.map(t => active.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#E6221A' },
+            { label: '완료', data: types.map(t => done.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#53565A' }
         ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
     }
 
