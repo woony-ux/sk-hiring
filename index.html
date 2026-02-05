@@ -49,7 +49,7 @@
         <div id="doneContainer" class="chart-container"><canvas id="toDoneChart"></canvas></div>
     </div>
     <div class="card">
-        <h2>채용 완료 직군 구성 (L열 기준)</h2>
+        <h2>채용 완료 직군 구성</h2>
         <div class="chart-container"><canvas id="categoryChart"></canvas></div>
     </div>
     <div class="card"><h2>고용 형태별</h2><div class="chart-container"><canvas id="typeChart"></canvas></div></div>
@@ -68,27 +68,28 @@
     }
 
     function processPos(data) {
-        // '진행중' 및 '완료' 상태 필터링 (헤더 모드이므로 이름을 직접 사용)
         const active = data.filter(d => String(d['상태']).trim() === '진행중');
         const done = data.filter(d => String(d['상태']).trim() === '완료');
 
-        // 1. 전략채용 카운트
         const strategyCount = done.filter(d => String(d['공고명']).includes('전략')).length;
         document.getElementById('strategyCount').innerText = strategyCount + "명";
         document.getElementById('openCount').innerText = active.length + "건";
 
-        // 2. 월별 채용 추이 (정밀 로직)
+        // 월별 채용 추이 교정 로직
         const monthCounts = { "2025.12": 0, "2026.1": 0, "2026.2": 0, "2026.3": 0 };
         
         done.forEach(d => {
-            const dateStr = d['최종 합격일'] || "";
-            if(dateStr.includes('.')) {
-                const parts = dateStr.split('.');
-                const year = parts[0].trim();
-                const month = parseInt(parts[1].trim());
-                const key = `${year}.${month}`;
-                if(monthCounts.hasOwnProperty(key)) {
-                    monthCounts[key]++;
+            let dateStr = String(d['최종 합격일'] || "").trim();
+            if(dateStr) {
+                // 마침표(.)를 기준으로 분리 후 연도와 월 추출
+                const parts = dateStr.split('.').map(p => p.trim());
+                if(parts.length >= 2) {
+                    const year = parts[0];
+                    const month = parseInt(parts[1]);
+                    const key = `${year}.${month}`;
+                    if(monthCounts.hasOwnProperty(key)) {
+                        monthCounts[key]++;
+                    }
                 }
             }
         });
@@ -102,11 +103,10 @@
             borderColor: '#E6221A',
             backgroundColor: 'rgba(230, 34, 26, 0.1)',
             fill: true,
-            pointRadius: 5,
+            pointRadius: 6,
             tension: 0.2
         }]);
 
-        // 3. 직군별 구성 (L열 -> PapaParse header:true 모드에서는 열 이름 "직군" 사용)
         const categories = {};
         done.forEach(d => {
             const jobGroup = String(d['직군'] || "미분류").trim();
@@ -114,7 +114,6 @@
         });
         updateChart('categoryChart', 'doughnut', Object.keys(categories), [{ data: Object.values(categories), backgroundColor: ['#E6221A', '#53565A', '#F37021', '#FFB400', '#000000'] }]);
 
-        // 4. 리드타임
         let leadTimes = [];
         done.forEach(d => {
             const s = new Date(String(d['오픈 날짜']).replace(/\./g, '-'));
@@ -123,7 +122,6 @@
         });
         if(leadTimes.length > 0) document.getElementById('avgLeadTime').innerText = Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) + "일";
 
-        // 고용형태 및 사유
         renderStackChart('typeChart', active, done, '고용형태', ['정규직','계약직','파견직']);
         renderStackChart('reasonChart', active, done, '채용사유', ['신규 채용','대체 채용']);
     }
