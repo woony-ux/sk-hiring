@@ -39,12 +39,12 @@
 
 <div class="chart-grid">
     <div class="card full-width">
-        <h2>조직 및 팀별 잔여 T.O 현황 (빨간색)</h2>
+        <h2>조직 및 팀별 잔여 T.O 현황</h2>
         <div class="chart-container"><canvas id="toRemainChart"></canvas></div>
     </div>
 
     <div class="card full-width">
-        <h2>팀 및 셀별 채용 완료 현황 (회색)</h2>
+        <h2>팀 및 셀별 채용 완료 현황</h2>
         <div id="doneContainer" class="chart-container"><canvas id="toDoneChart"></canvas></div>
     </div>
 
@@ -98,23 +98,27 @@
         let doneLabels = [], doneValues = [];
 
         data.forEach(row => {
-            const name = String(row[0]).trim();
-            const doneVal = parseInt(row[3]) || 0;   // D열: 채용인원
+            const orgName = String(row[0]).trim(); // A열: 조직명
+            const cellName = String(row[1]).trim(); // B열: 셀 이름
+            const doneVal = parseInt(row[3]) || 0;  // D열: 채용인원
             const remainVal = parseInt(row[4]) || 0; // E열: 남은 T.O
 
-            if (name.includes("합계")) {
+            if (orgName.includes("합계")) {
                 totalRemain = remainVal;
             } 
-            else if (name && name !== "조직" && name !== "팀") {
-                // 1. 잔여 TO 차트: 상위 팀(팀/본부/실)만 포함
-                if (name.includes('팀') || name.includes('본부') || name.includes('실')) {
-                    if (!remainLabels.includes(name)) {
-                        remainLabels.push(name);
+            else if (orgName && orgName !== "조직" && orgName !== "팀") {
+                // 1. 잔여 TO 차트: 상위 팀(A열 기준)만 포함
+                if (orgName.includes('팀') || orgName.includes('본부') || orgName.includes('실')) {
+                    if (!remainLabels.includes(orgName)) {
+                        remainLabels.push(orgName);
                         remainValues.push(remainVal);
                     }
                 }
-                // 2. 채용 완료 차트: 모든 조직 및 셀 포함 (시트 순서대로)
-                doneLabels.push(name);
+                
+                // 2. 채용 완료 차트: B열(셀 이름) 데이터를 기반으로 표시
+                // 만약 B열에 값이 있으면 B열 이름을 사용하고, 없으면 A열 이름을 사용함
+                const displayName = (cellName && cellName !== "" && cellName !== "-") ? cellName : orgName;
+                doneLabels.push(displayName);
                 doneValues.push(doneVal);
             }
         });
@@ -124,7 +128,7 @@
         // 잔여 차트 (빨간색)
         updateChart('toRemainChart', 'bar', remainLabels, [{ label: '잔여 T.O', data: remainValues, backgroundColor: '#E6221A' }], { indexAxis: 'y' });
 
-        // 채용 완료 차트 (회색) - 높이 조절 포함
+        // 채용 완료 차트 (회색) - B열 데이터 반영
         const doneChartHeight = Math.max(450, doneLabels.length * 30);
         document.getElementById('doneContainer').style.height = doneChartHeight + "px";
         updateChart('toDoneChart', 'bar', doneLabels, [{ label: '채용완료 인원', data: doneValues, backgroundColor: '#53565A' }], { indexAxis: 'y' });
