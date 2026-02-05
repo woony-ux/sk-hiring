@@ -11,15 +11,15 @@
         :root { --sk-red: #E6221A; --sk-orange: #F37021; --sk-gray: #53565A; --sk-light-gray: #f0f2f5; }
         body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--sk-light-gray); margin: 0; padding: 20px; }
         .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 1rem; border-radius: 10px; margin-bottom: 20px; text-align: center; }
-        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; border-bottom: 5px solid var(--sk-red); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .metric-value { font-size: 2.2rem; font-weight: bold; color: var(--sk-red); margin: 5px 0; }
-        .metric-sub { font-size: 0.75rem; color: #888; }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .metric-card { background: white; padding: 15px; border-radius: 12px; text-align: center; border-bottom: 5px solid var(--sk-red); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .metric-value { font-size: 1.8rem; font-weight: bold; color: var(--sk-red); margin: 5px 0; }
+        .metric-sub { font-size: 0.7rem; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
         .full-width { grid-column: 1 / -1; }
         .chart-container { position: relative; min-height: 350px; width: 100%; }
-        h2 { font-size: 1.1rem; margin-top: 0; color: #333; border-left: 4px solid var(--sk-red); padding-left: 10px; margin-bottom: 20px; }
+        h2 { font-size: 1rem; margin-top: 0; color: #333; border-left: 4px solid var(--sk-red); padding-left: 10px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -32,6 +32,8 @@
     <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div></div>
     <div class="metric-card"><h3>전략채용 완료</h3><div id="strategyCount" class="metric-value">-</div></div>
     <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div></div>
+    <div class="metric-card"><h3>최단 리드타임</h3><div id="minLeadTime" class="metric-value">-</div><div id="minLeadPos" class="metric-sub">-</div></div>
+    <div class="metric-card"><h3>최장 리드타임</h3><div id="maxLeadTime" class="metric-value">-</div><div id="maxLeadPos" class="metric-sub">-</div></div>
     <div class="metric-card"><h3>2026 잔여 T.O</h3><div id="totalTO" class="metric-value">-</div><div class="metric-sub">전사 합계</div></div>
 </div>
 
@@ -71,56 +73,65 @@
         const active = data.filter(d => String(d['상태']).trim() === '진행중');
         const done = data.filter(d => String(d['상태']).trim() === '완료');
 
+        // 전략채용 인원
         const strategyCount = done.filter(d => String(d['공고명']).includes('전략')).length;
         document.getElementById('strategyCount').innerText = strategyCount + "명";
         document.getElementById('openCount').innerText = active.length + "건";
 
-        // 월별 채용 추이 교정 로직
-        const monthCounts = { "2025.12": 0, "2026.1": 0, "2026.2": 0, "2026.3": 0 };
+        // 월별 추이 (강력한 정규식 파싱 적용)
+        const monthlyCounts = { "2025-12": 0, "2026-01": 0, "2026-02": 0, "2026-03": 0 };
         
         done.forEach(d => {
             let dateStr = String(d['최종 합격일'] || "").trim();
-            if(dateStr) {
-                // 마침표(.)를 기준으로 분리 후 연도와 월 추출
-                const parts = dateStr.split('.').map(p => p.trim());
-                if(parts.length >= 2) {
-                    const year = parts[0];
-                    const month = parseInt(parts[1]);
-                    const key = `${year}.${month}`;
-                    if(monthCounts.hasOwnProperty(key)) {
-                        monthCounts[key]++;
-                    }
-                }
+            // 숫자만 추출하여 202512 또는 20261 형식으로 변환 시도
+            const match = dateStr.match(/(\d{4})[\.\s-]+(\d{1,2})/);
+            if(match) {
+                const year = match[1];
+                const month = match[2].padStart(2, '0');
+                const key = `${year}-${month}`;
+                if(monthlyCounts.hasOwnProperty(key)) monthlyCounts[key]++;
             }
         });
 
         const monthLabels = ["25년 12월", "26년 1월", "26년 2월", "26년 3월"];
-        const monthValues = [monthCounts["2025.12"], monthCounts["2026.1"], monthCounts["2026.2"], monthCounts["2026.3"]];
+        const monthValues = [monthlyCounts["2025-12"], monthlyCounts["2026-01"], monthlyCounts["2026-02"], monthlyCounts["2026-03"]];
         
-        updateChart('monthlyChart', 'line', monthLabels, [{
+        // 막대 그래프(Bar)로 변경하여 수치를 더 명확하게 표현
+        updateChart('monthlyChart', 'bar', monthLabels, [{
             label: '채용 완료 인원',
             data: monthValues,
-            borderColor: '#E6221A',
-            backgroundColor: 'rgba(230, 34, 26, 0.1)',
-            fill: true,
-            pointRadius: 6,
-            tension: 0.2
-        }]);
+            backgroundColor: monthValues.map((v, i) => i === 1 ? '#E6221A' : '#53565A'), // 1월 강조
+            borderRadius: 5
+        }], { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } });
 
+        // 리드타임 카드 복구
+        let leadTimes = [];
+        done.forEach(d => {
+            const s = new Date(String(d['오픈 날짜']).replace(/\./g, '-'));
+            const e = new Date(String(d['최종 합격일']).replace(/\./g, '-'));
+            if(!isNaN(s) && !isNaN(e)) {
+                const diff = Math.round((e - s) / 86400000);
+                leadTimes.push({ title: d['공고명'], days: diff });
+            }
+        });
+
+        if(leadTimes.length > 0) {
+            const avg = Math.round(leadTimes.reduce((a, b) => a + b.days, 0) / leadTimes.length);
+            leadTimes.sort((a, b) => a.days - b.days);
+            document.getElementById('avgLeadTime').innerText = avg + "일";
+            document.getElementById('minLeadTime').innerText = leadTimes[0].days + "일";
+            document.getElementById('minLeadPos').innerText = leadTimes[0].title;
+            document.getElementById('maxLeadTime').innerText = leadTimes[leadTimes.length-1].days + "일";
+            document.getElementById('maxLeadPos').innerText = leadTimes[leadTimes.length-1].title;
+        }
+
+        // 직군 구성
         const categories = {};
         done.forEach(d => {
             const jobGroup = String(d['직군'] || "미분류").trim();
             if(jobGroup) categories[jobGroup] = (categories[jobGroup] || 0) + 1;
         });
         updateChart('categoryChart', 'doughnut', Object.keys(categories), [{ data: Object.values(categories), backgroundColor: ['#E6221A', '#53565A', '#F37021', '#FFB400', '#000000'] }]);
-
-        let leadTimes = [];
-        done.forEach(d => {
-            const s = new Date(String(d['오픈 날짜']).replace(/\./g, '-'));
-            const e = new Date(String(d['최종 합격일']).replace(/\./g, '-'));
-            if(!isNaN(s) && !isNaN(e)) leadTimes.push(Math.round((e - s) / 86400000));
-        });
-        if(leadTimes.length > 0) document.getElementById('avgLeadTime').innerText = Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) + "일";
 
         renderStackChart('typeChart', active, done, '고용형태', ['정규직','계약직','파견직']);
         renderStackChart('reasonChart', active, done, '채용사유', ['신규 채용','대체 채용']);
