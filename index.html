@@ -1,52 +1,180 @@
-function processTO(data) {
-        const headerRow = data[0]; 
-        const orgIdx = headerRow.indexOf("조직");
-        const toIdx = headerRow.findIndex(h => h.includes("잔여 TO") || h.includes("잔여 T.O"));
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SK일렉링크 채용 전략 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+        .header { background: linear-gradient(90deg, #E6221A, #F37021); color: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(230, 34, 26, 0.2); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 25px; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid #eee; min-height: 400px; }
+        .full-width { grid-column: 1 / -1; }
+        .metric-container { display: flex; gap: 20px; margin-bottom: 25px; flex-wrap: wrap; }
+        .metric-card { flex: 1; min-width: 200px; background: white; padding: 20px; border-radius: 12px; text-align: center; border-left: 5px solid #E6221A; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .metric-value { font-size: 2.2rem; font-weight: bold; color: #E6221A; margin-top: 10px; }
+        h3 { margin-top: 0; font-size: 1.1rem; color: #555; }
+        canvas { width: 100% !important; }
+    </style>
+</head>
+<body>
 
+<div class="header">
+    <h1 style="margin:0">SK electlink Recruiting Dashboard</h1>
+    <p style="margin:5px 0 0 0; opacity: 0.9;">채용 현황 및 조직별 잔여 T.O (실시간)</p>
+</div>
+
+<div class="metric-container">
+    <div class="metric-card">
+        <h3>현재 오픈 공고 (진행중)</h3>
+        <div id="openCount" class="metric-value">0건</div>
+    </div>
+    <div class="metric-card">
+        <h3>평균 채용 리드타임</h3>
+        <div id="avgLeadTime" class="metric-value">0일</div>
+    </div>
+    <div class="metric-card">
+        <h3>2026 전체 잔여 T.O</h3>
+        <div id="totalTO" class="metric-value">0명</div>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card full-width" style="min-height: 500px;">
+        <h3>조직 및 셀별 잔여 T.O (상위조직 포함)</h3>
+        <canvas id="toChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>고용 형태별 현황 (진행 vs 완료)</h3>
+        <canvas id="typeChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>채용 사유별 현황 (진행 vs 완료)</h3>
+        <canvas id="reasonChart"></canvas>
+    </div>
+</div>
+
+<script>
+    const posUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=867729802&single=true&output=csv";
+    const toUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=770067438&single=true&output=csv";
+
+    // 데이터 로드 시작
+    function init() {
+        Papa.parse(posUrl, {
+            download: true,
+            header: true,
+            complete: function(results) {
+                processPositionData(results.data);
+            }
+        });
+
+        Papa.parse(toUrl, {
+            download: true,
+            header: true,
+            complete: function(results) {
+                processTOData(results.data);
+            }
+        });
+    }
+
+    // 포지션 현황 데이터 처리
+    function processPositionData(data) {
+        const active = data.filter(d => d['상태'] && d['상태'].trim() === '진행중');
+        const done = data.filter(d => d['상태'] && d['상태'].trim() === '완료');
+
+        document.getElementById('openCount').innerText = active.length + "건";
+
+        // 리드타임 계산
+        let totalDays = 0, count = 0;
+        done.forEach(p => {
+            const start = new Date(p['오픈 날짜']);
+            const end = new Date(p['최종 합격일']);
+            if(!isNaN(start) && !isNaN(end)) {
+                totalDays += (end - start) / (1000 * 60 * 60 * 24);
+                count++;
+            }
+        });
+        document.getElementById('avgLeadTime').innerText = count > 0 ? Math.round(totalDays/count) + "일" : "- 일";
+
+        // 차트 생성 (고용형태, 채용사유)
+        renderComparisonChart('typeChart', active, done, '고용형태', ['정규직', '계약직', '파견직', '용역직']);
+        renderComparisonChart('reasonChart', active, done, '채용사유', ['신규채용', '대체채용']);
+    }
+
+    // T.O 데이터 처리 (상위조직 중복 방지 로직 포함)
+    function processTOData(data) {
         let labels = [];
         let values = [];
         let colors = [];
-        let totalSum = 0; // 중복 합산을 방지한 진짜 합계
+        let totalSum = 0;
 
-        for (let i = 1; i < data.length; i++) {
-            let row = data[i];
-            let orgName = row[orgIdx] ? row[orgIdx].trim() : "";
-            let toValue = parseInt(row[toIdx]);
+        data.forEach(row => {
+            let orgName = row['조직'] ? row['조직'].trim() : "";
+            let toValue = parseInt(row['2026년 잔여 TO']) || parseInt(row['2026년 잔여 T.O']) || 0;
 
             if (orgName && !isNaN(toValue)) {
                 labels.push(orgName);
                 values.push(toValue);
 
-                // 상위 조직(팀, 본부)인 경우에만 전체 합계에 더함
+                // 상위 조직(팀/본부)인 경우에만 전체 합계에 반영
                 if (orgName.includes('팀') || orgName.includes('본부')) {
                     totalSum += toValue;
-                    colors.push('#E6221A'); // 상위 조직은 진한 빨강
+                    colors.push('#E6221A'); // 상위조직 빨강
                 } else {
-                    // 하위 셀인 경우 합계에서는 제외하고 차트에만 표시
-                    colors.push('#F37021'); // 하위 셀은 주황색
+                    colors.push('#F37021'); // 하위셀 주황
                 }
             }
-        }
+        });
 
-        // 중복 없이 계산된 합계만 화면에 표시
         document.getElementById('totalTO').innerText = totalSum + "명";
 
-        // 차트 생성 (시각적으로는 계층 구조를 그대로 보여줌)
         new Chart(document.getElementById('toChart'), {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: '잔여 T.O (단위: 명)',
+                    label: '잔여 T.O (명)',
                     data: values,
                     backgroundColor: colors,
                     borderRadius: 5
                 }]
             },
-            options: { 
+            options: {
                 indexAxis: 'y',
                 maintainAspectRatio: false,
                 scales: { x: { beginAtZero: true } }
             }
         });
     }
+
+    // 비교 차트 렌더링 함수
+    function renderComparisonChart(id, active, done, field, labels) {
+        const activeData = labels.map(l => active.filter(d => d[field] && d[field].trim() === l).length);
+        const doneData = labels.map(l => done.filter(d => d[field] && d[field].trim() === l).length);
+
+        new Chart(document.getElementById(id), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: '진행중', data: activeData, backgroundColor: '#E6221A' },
+                    { label: '완료', data: doneData, backgroundColor: '#53565A' }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: { x: { stacked: true }, y: { stacked: true } }
+            }
+        });
+    }
+
+    // 실행
+    init();
+</script>
+</body>
+</html>
