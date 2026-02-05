@@ -20,8 +20,11 @@
         .full-width { grid-column: 1 / -1; }
         .chart-container { position: relative; min-height: 350px; width: 100%; }
         h2 { font-size: 1rem; margin-top: 0; color: #333; border-left: 4px solid var(--sk-red); padding-left: 10px; margin-bottom: 20px; }
+        /* 최하단 리스트 스타일 (링크 포함) */
         .pos-list-full { list-style: none; padding: 0; margin: 0; }
         .pos-item-full { background: #fff; padding: 12px 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 8px; display: flex; align-items: center; font-size: 0.95rem; }
+        .pos-item-full a { text-decoration: none; color: #333; font-weight: 500; transition: color 0.2s; }
+        .pos-item-full a:hover { color: var(--sk-red); text-decoration: underline; }
         .pos-item-full::before { content: '🚀'; margin-right: 12px; }
     </style>
 </head>
@@ -31,7 +34,11 @@
 
 <div class="metric-grid">
     <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div></div>
-    <div class="metric-card"><h3>전략채용</h3><div id="strategyCount" class="metric-value">-</div></div>
+    <div class="metric-card">
+        <h3>전략채용</h3>
+        <div id="strategyCount" class="metric-value">-</div>
+        <div class="metric-sub">(CEO 직접 영입)</div>
+    </div>
     <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div></div>
     <div class="metric-card"><h3>최단 리드타임</h3><div id="minLeadTime" class="metric-value">-</div><div id="minLeadPos" class="metric-sub">-</div></div>
     <div class="metric-card"><h3>최장 리드타임</h3><div id="maxLeadTime" class="metric-value">-</div><div id="maxLeadPos" class="metric-sub">-</div></div>
@@ -65,43 +72,51 @@
     }
 
     function processPos(data) {
-        // 행 번호 기반 추출 (A열=0, B열=1...)
         const rows = data.slice(1);
         
-        // --- [핵심] 전략채용 표 인원 직접 카운트 ---
+        // --- 1. 전략채용(CEO 영입) 카운트 로직 강화 ---
         let strategyRowsCount = 0;
         let isStrategySection = false;
         
         data.forEach(row => {
-            const cellValue = String(row[0] || "").trim();
-            // 시트 어디서든 '전략채용'이라는 텍스트가 나오면 그 다음부터 카운트 시작
-            if (cellValue.includes("전략채용")) {
+            const firstCol = String(row[0] || "").trim();
+            if (firstCol.includes("전략채용") || firstCol.includes("CEO")) {
                 isStrategySection = true;
                 return;
             }
-            // 전략채용 섹션 안에서 내용이 있는 행만 카운트 (합계 행 등 제외 조건)
-            if (isStrategySection && cellValue && !cellValue.includes("합계") && !cellValue.includes("공고명")) {
+            if (isStrategySection && firstCol && !firstCol.includes("합계") && !firstCol.includes("공고명")) {
                 strategyRowsCount++;
             }
         });
         document.getElementById('strategyCount').innerText = strategyRowsCount + "건";
-        // ----------------------------------------
 
+        // --- 2. 진행중 포지션 하이퍼링크 연결 ---
+        // 시트의 링크 데이터는 일반적으로 CSV 추출 시 URL 텍스트가 포함되거나 특정 열에 위치함
+        // 여기서는 데이터의 첫 번째 열(공고명)에 링크가 있다고 가정하고 처리하거나, 
+        // 시트에서 추출된 데이터 중 URL 형식을 찾아 연결함
         const active = rows.filter(r => String(r[4]).trim() === '진행중');
         const done = rows.filter(r => String(r[4]).trim() === '완료');
 
         document.getElementById('openCount').innerText = active.length + "건";
-        document.getElementById('positionListFull').innerHTML = active.map(r => `<div class="pos-item-full">${r[0]}</div>`).join('');
+        
+        document.getElementById('positionListFull').innerHTML = active.map(r => {
+            // 시트에서 '공고명' 안에 링크가 포함되어 추출되는 경우가 많으므로 이를 활용
+            // 만약 시트에 별도의 링크 열이 있다면 r[번호]를 수정해야 함
+            const title = r[0];
+            const link = r[13] || "#"; // 14번째 열(N열) 등에 링크가 있다고 가정 (필요 시 수정)
+            return `<div class="pos-item-full"><a href="${link}" target="_blank">${title}</a></div>`;
+        }).join('');
 
-        const monthly = { "2025-12": 0, "2026-01": 0, "2026-02": 0 };
+        // 3. 차트 데이터 처리 (기존 유지)
+        const months = { "2025-12": 0, "2026-01": 0, "2026-02": 0 };
         done.forEach(r => {
             const m = String(r[6]).match(/(\d{4})[\.\s-]+(\d{1,2})/);
             if(m) {
                 const key = `${m[1]}-${m[2].padStart(2, '0')}`;
-                if(monthly.hasOwnProperty(key)) monthly[key]++;
+                if(months.hasOwnProperty(key)) months[key]++;
             }
         });
-        updateChart('monthlyChart', 'bar', ["25년 12월", "26년 1월", "26년 2월"], [{ label: '인원', data: Object.values(monthly), backgroundColor: '#E6221A' }], { scales: { y: intAxis } });
+        updateChart('monthlyChart', 'bar', ["25년 12월", "26년 1월", "26년 2월"], [{ label: '인원', data: Object.values(months), backgroundColor: '#E6221A' }], { scales: { y: intAxis } });
 
         let lt = [];
         done.forEach(r => {
