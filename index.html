@@ -10,11 +10,11 @@
     <style>
         :root { --sk-red: #E6221A; --sk-orange: #F37021; --sk-gray: #53565A; --sk-light-gray: #f0f2f5; }
         body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--sk-light-gray); margin: 0; padding: 20px; }
-        .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 1rem; border-radius: 10px; margin-bottom: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 1rem; border-radius: 10px; margin-bottom: 20px; text-align: center; }
         .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; border-bottom: 5px solid var(--sk-red); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .metric-value { font-size: 2.2rem; font-weight: bold; color: var(--sk-red); margin: 5px 0; }
-        .metric-sub { font-size: 0.75rem; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .metric-sub { font-size: 0.75rem; color: #888; }
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
         .full-width { grid-column: 1 / -1; }
@@ -30,25 +30,30 @@
 
 <div class="metric-grid">
     <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div></div>
-    <div class="metric-card"><h3>전략채용 완료</h3><div id="strategyCount" class="metric-value">-</div><div class="metric-sub">누적 기준</div></div>
+    <div class="metric-card"><h3>전략채용 완료</h3><div id="strategyCount" class="metric-value">-</div></div>
     <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div></div>
     <div class="metric-card"><h3>2026 잔여 T.O</h3><div id="totalTO" class="metric-value">-</div><div class="metric-sub">전사 합계</div></div>
 </div>
 
 <div class="chart-grid">
     <div class="card full-width">
-        <h2>월별 채용 완료 추이</h2>
+        <h2>월별 채용 완료 추이 (25년 12월 이후)</h2>
         <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
     </div>
 
-    <div class="card">
-        <h2>직군별 인원 구성 (자동 분류)</h2>
-        <div class="chart-container"><canvas id="categoryChart"></canvas></div>
+    <div class="card full-width">
+        <h2>조직 및 팀별 잔여 T.O 현황</h2>
+        <div class="chart-container"><canvas id="toRemainChart"></canvas></div>
     </div>
 
     <div class="card">
         <h2>셀별 채용 완료 현황</h2>
-        <div id="doneContainer" class="chart-container" style="min-height: 350px;"><canvas id="toDoneChart"></canvas></div>
+        <div id="doneContainer" class="chart-container"><canvas id="toDoneChart"></canvas></div>
+    </div>
+
+    <div class="card">
+        <h2>채용 완료 직군 구성 (L열 기준)</h2>
+        <div class="chart-container"><canvas id="categoryChart"></canvas></div>
     </div>
 
     <div class="card"><h2>고용 형태별</h2><div class="chart-container"><canvas id="typeChart"></canvas></div></div>
@@ -71,67 +76,76 @@
         const active = rows.filter(r => String(r[4]).trim() === '진행중');
         const done = rows.filter(r => String(r[4]).trim() === '완료');
         
-        // 1. 전략채용 카운트 (공고명에 '전략' 포함)
         const strategyCount = rows.filter(r => String(r[0]).includes('전략') && String(r[4]).trim() === '완료').length;
         document.getElementById('strategyCount').innerText = strategyCount + "명";
         document.getElementById('openCount').innerText = active.length + "건";
 
-        // 2. 월별 채용 추이 (최종합격일 기준)
-        const monthlyData = {};
+        // 1. 월별 채용 추이 (25년 12월을 가장 앞으로)
+        const monthlyCounts = { "25.12": 0, "26.01": 0, "26.02": 0, "26.03": 0 };
         done.forEach(r => {
-            if(r[6]) { // G열: 최종합격일
-                const month = r[6].split('.')[1]; 
-                if(month) {
-                    const label = parseInt(month) + "월";
-                    monthlyData[label] = (monthlyData[label] || 0) + 1;
+            if(r[6]) { // G열 최종합격일
+                const dateParts = r[6].split('.'); 
+                if(dateParts.length >= 2) {
+                    const key = dateParts[0].trim().slice(-2) + "." + dateParts[1].trim().padStart(2, '0');
+                    if(monthlyCounts.hasOwnProperty(key)) monthlyCounts[key]++;
                 }
             }
         });
-        const monthLabels = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
-        const monthValues = monthLabels.map(m => monthlyData[m] || 0);
-        updateChart('monthlyChart', 'line', monthLabels, [{ label: '채용 인원', data: monthValues, borderColor: '#E6221A', backgroundColor: 'rgba(230, 34, 26, 0.1)', fill: true, tension: 0.3 }]);
+        const monthLabels = ["25년 12월", "26년 1월", "26년 2월", "26년 3월"];
+        updateChart('monthlyChart', 'line', monthLabels, [{ label: '완료 인원', data: Object.values(monthlyCounts), borderColor: '#E6221A', backgroundColor: 'rgba(230, 34, 26, 0.1)', fill: true, tension: 0.3 }]);
 
-        // 3. 직군별 자동 분류 (개발/비즈니스/스탭)
-        const categories = { '개발': 0, '비즈니스': 0, '스탭': 0 };
-        rows.forEach(r => {
-            const title = r[0] + r[1]; // 공고명 + 부서명
-            if(/개발|IT|엔지니어|SW|Platform|Data|서버|프론트|인프라/.test(title)) categories['개발']++;
-            else if(/영업|마케팅|Biz|사업|운영|Sales|BD/.test(title)) categories['비즈니스']++;
-            else categories['스탭']++;
+        // 2. 직군별 구성 (L열: index 11)
+        const categories = {};
+        done.forEach(r => {
+            const jobGroup = String(r[11] || "미분류").trim();
+            if(jobGroup && jobGroup !== "직군") {
+                categories[jobGroup] = (categories[jobGroup] || 0) + 1;
+            }
         });
-        updateChart('categoryChart', 'doughnut', Object.keys(categories), [{ data: Object.values(categories), backgroundColor: ['#E6221A', '#53565A', '#F37021'] }]);
+        updateChart('categoryChart', 'doughnut', Object.keys(categories), [{ data: Object.values(categories), backgroundColor: ['#E6221A', '#53565A', '#F37021', '#FFB400', '#000000'] }]);
 
-        // 기존 리드타임 및 기타 차트
+        // 리드타임
         let leadTimes = [];
         done.forEach(r => {
             if(r[5] && r[6]) {
                 const s = new Date(r[5].replace(/\./g, '-')), e = new Date(r[6].replace(/\./g, '-'));
-                if(!isNaN(s) && !isNaN(e)) leadTimes.push(Math.round((e - s) / (86400000)));
+                if(!isNaN(s) && !isNaN(e)) leadTimes.push(Math.round((e - s) / 86400000));
             }
         });
-        if(leadTimes.length > 0) {
-            document.getElementById('avgLeadTime').innerText = Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) + "일";
-        }
+        if(leadTimes.length > 0) document.getElementById('avgLeadTime').innerText = Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) + "일";
 
         renderStackChart('typeChart', active, done, 7, ['정규직','계약직','파견직']);
         renderStackChart('reasonChart', active, done, 8, ['신규 채용','대체 채용']);
     }
 
     function processTO(data) {
-        let totalRemain = 0, doneLabels = [], doneValues = [];
+        let totalRemain = 0;
+        let remainLabels = [], remainValues = [];
+        let doneLabels = [], doneValues = [];
+
         data.forEach(row => {
             const orgName = String(row[0] || "").trim();
             const cellName = String(row[1] || "").trim();
             const doneVal = parseInt(row[3]) || 0;
             const remainVal = parseInt(row[4]) || 0;
 
-            if (orgName.includes("합계")) totalRemain = remainVal;
-            else if (orgName && orgName !== "조직" && cellName && cellName !== "" && cellName !== "-" && orgName !== cellName) {
-                doneLabels.push(cellName);
-                doneValues.push(doneVal);
+            if (orgName.includes("합계")) {
+                totalRemain = remainVal;
+            } else if (orgName && orgName !== "조직" && orgName !== "팀") {
+                // 상위 조직 잔여 TO (A=B인 노란색 행 기준)
+                if (orgName === cellName && (orgName.includes('팀') || orgName.includes('본부') || orgName.includes('실'))) {
+                    remainLabels.push(orgName);
+                    remainValues.push(remainVal);
+                }
+                // 셀별 완료 (B열 고유 이름 행)
+                if (cellName && cellName !== "" && cellName !== "-" && orgName !== cellName) {
+                    doneLabels.push(cellName);
+                    doneValues.push(doneVal);
+                }
             }
         });
         document.getElementById('totalTO').innerText = totalRemain + "명";
+        updateChart('toRemainChart', 'bar', remainLabels, [{ label: '잔여 T.O', data: remainValues, backgroundColor: '#E6221A' }], { indexAxis: 'y' });
         updateChart('toDoneChart', 'bar', doneLabels, [{ label: '채용완료', data: doneValues, backgroundColor: '#53565A' }], { indexAxis: 'y' });
     }
 
@@ -144,12 +158,10 @@
     function updateChart(id, type, labels, datasets, extraOpts = {}) {
         if(charts[id]) charts[id].destroy();
         charts[id] = new Chart(document.getElementById(id), {
-            type: type,
-            data: { labels: labels, datasets: datasets },
+            type: type, data: { labels: labels, datasets: datasets },
             options: { maintainAspectRatio: false, responsive: true, ...extraOpts }
         });
     }
-
     init();
 </script>
 </body>
