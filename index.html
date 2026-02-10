@@ -28,22 +28,15 @@
     </style>
 </head>
 <body>
-
 <div class="header"><h1>SK electlink Recruitment Dashboard</h1></div>
-
 <div class="metric-grid">
     <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div></div>
-    <div class="metric-card">
-        <h3>전략채용</h3>
-        <div class="metric-value">4건</div>
-        <div class="metric-sub">(CEO 직접 영입)</div>
-    </div>
+    <div class="metric-card"><h3>전략채용</h3><div class="metric-value">4건</div><div class="metric-sub">(CEO 직접 영입)</div></div>
     <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div></div>
     <div class="metric-card"><h3>최단 리드타임</h3><div id="minLeadTime" class="metric-value">-</div><div id="minLeadPos" class="metric-sub">-</div></div>
     <div class="metric-card"><h3>최장 리드타임</h3><div id="maxLeadTime" class="metric-value">-</div><div id="maxLeadPos" class="metric-sub">-</div></div>
     <div class="metric-card"><h3>2026 잔여 T.O</h3><div id="totalTO" class="metric-value">-</div></div>
 </div>
-
 <div class="chart-grid">
     <div class="card full-width"><h2>월별 채용 완료 추이</h2><div class="chart-container"><canvas id="monthlyChart"></canvas></div></div>
     <div class="card full-width"><h2>조직 및 팀별 잔여 T.O 현황</h2><div class="chart-container"><canvas id="toRemainChart"></canvas></div></div>
@@ -52,16 +45,11 @@
     <div class="card"><h2>고용 형태별</h2><div class="chart-container"><canvas id="typeChart"></canvas></div></div>
     <div class="card full-width"><h2>채용 사유별</h2><div class="chart-container"><canvas id="reasonChart"></canvas></div></div>
 </div>
-
-<div class="card full-width">
-    <h2>현재 진행 중인 포지션 명단</h2>
-    <div id="positionListFull" class="pos-list-full">데이터 로딩 중...</div>
-</div>
+<div class="card full-width"><h2>현재 진행 중인 포지션 명단</h2><div id="positionListFull" class="pos-list-full">데이터 로딩 중...</div></div>
 
 <script>
     const posUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=867729802&single=true&output=csv";
     const toUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4NyWr_pNBx82IrYqAeZV60ST3D14ZzH2F1uYsHrpGWQ9PQ8KP8MLR98Ao_yppXjwqoHwqR-AvLRyR/pub?gid=770067438&single=true&output=csv";
-
     let charts = {};
     const intAxis = { ticks: { stepSize: 1, precision: 0 }, beginAtZero: true };
 
@@ -74,31 +62,21 @@
         const rows = data.slice(1);
         const active = rows.filter(r => String(r[4]).trim() === '진행중');
         const done = rows.filter(r => String(r[4]).trim() === '완료');
-
         document.getElementById('openCount').innerText = active.length + "건";
-        
-        // --- M열(12번 인덱스) 링크 데이터 적용 ---
         document.getElementById('positionListFull').innerHTML = active.map(r => {
             const title = r[0];
-            const foundLink = String(r[12] || "").trim(); // M열은 0부터 시작할 때 12번째 인덱스입니다.
-
-            if(!foundLink || !foundLink.startsWith("http")) {
-                return `<div class="pos-item-full"><span>${title}</span></div>`;
-            }
-
-            return `<div class="pos-item-full"><a href="${foundLink}" target="_blank">${title}</a></div>`;
+            const foundLink = String(r[12] || "").trim();
+            return foundLink.startsWith("http") ? `<div class="pos-item-full"><a href="${foundLink}" target="_blank">${title}</a></div>` : `<div class="pos-item-full"><span>${title}</span></div>`;
         }).join('');
-
+        
+        // 월별/리드타임/직군/형태/사유 차트 로직 (기존 유지)
         const months = { "2025-12": 0, "2026-01": 0, "2026-02": 0 };
         done.forEach(r => {
             const m = String(r[6]).match(/(\d{4})[\.\s-]+(\d{1,2})/);
-            if(m) {
-                const key = `${m[1]}-${m[2].padStart(2, '0')}`;
-                if(months.hasOwnProperty(key)) months[key]++;
-            }
+            if(m) { const key = `${m[1]}-${m[2].padStart(2, '0')}`; if(months.hasOwnProperty(key)) months[key]++; }
         });
         updateChart('monthlyChart', 'bar', ["25년 12월", "26년 1월", "26년 2월"], [{ label: '인원', data: Object.values(months), backgroundColor: '#E6221A' }], { scales: { y: intAxis } });
-
+        
         let lt = [];
         done.forEach(r => {
             const s = new Date(String(r[5]).replace(/\./g, '-')), e = new Date(String(r[6]).replace(/\./g, '-'));
@@ -112,45 +90,45 @@
             document.getElementById('maxLeadTime').innerText = lt[lt.length-1].days + "일";
             document.getElementById('maxLeadPos').innerText = lt[lt.length-1].title;
         }
-
+        
         const cats = {}; done.forEach(r => { const g = String(r[11] || "미분류").trim(); cats[g] = (cats[g] || 0) + 1; });
-        updateChart('categoryChart', 'doughnut', Object.keys(cats), [{ 
-            data: Object.values(cats), 
-            backgroundColor: ['#E6221A', '#7B42FF', '#F37021', '#53565A', '#00C73C', '#248AF9'] 
-        }]);
-
+        updateChart('categoryChart', 'doughnut', Object.keys(cats), [{ data: Object.values(cats), backgroundColor: ['#E6221A', '#7B42FF', '#F37021', '#53565A', '#00C73C'] }]);
+        
         const rStats = { "신규": { active: 0, done: 0 }, "대체": { active: 0, done: 0 } };
         rows.forEach(r => {
             const reason = String(r[8] || ""), status = String(r[4]).trim();
             let key = reason.includes("신규") ? "신규" : (reason.includes("대체") ? "대체" : "");
-            if(key) {
-                if(status === "진행중") rStats[key].active++;
-                else if(status === "완료") rStats[key].done++;
-            }
+            if(key) { if(status === "진행중") rStats[key].active++; else if(status === "완료") rStats[key].done++; }
         });
-        updateChart('reasonChart', 'bar', ["신규채용", "대체채용"], [
-            { label: '오픈 공고', data: [rStats["신규"].active, rStats["대체"].active], backgroundColor: '#E6221A' },
-            { label: '채용 완료', data: [rStats["신규"].done, rStats["대체"].done], backgroundColor: '#53565A' }
-        ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
-
+        updateChart('reasonChart', 'bar', ["신규채용", "대체채용"], [{ label: '오픈 공고', data: [rStats["신규"].active, rStats["대체"].active], backgroundColor: '#E6221A' }, { label: '채용 완료', data: [rStats["신규"].done, rStats["대체"].done], backgroundColor: '#53565A' }], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
+        
         const types = ['정규직', '계약직', '파견직'];
-        updateChart('typeChart', 'bar', types, [
-            { label: '진행중', data: types.map(t => active.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#E6221A' },
-            { label: '완료', data: types.map(t => done.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#53565A' }
-        ], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
+        updateChart('typeChart', 'bar', types, [{ label: '진행중', data: types.map(t => active.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#E6221A' }, { label: '완료', data: types.map(t => done.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#53565A' }], { scales: { x: { stacked: true }, y: { stacked: true, ...intAxis } } });
     }
 
     function processTO(data) {
         let total = 0, remLab = [], remVal = [], doneLab = [], doneVal = [];
+        
         data.forEach(row => {
-            const org = String(row[0]||"").trim(), cell = String(row[1]||"").trim();
-            const dV = parseInt(row[3])||0, rV = parseInt(row[4])||0;
-            if (org.includes("합계")) total = rV;
-            else if (org && org !== "조직") {
-                if (org === cell) { remLab.push(org); remVal.push(rV); }
-                else if (cell && cell !== "-") { doneLab.push(cell); doneVal.push(dV); }
+            const org = String(row[0]||"").trim();
+            const cell = String(row[1]||"").trim();
+            const doneV = parseInt(row[3])||0;
+            const remV = parseInt(row[4])||0;
+
+            if (org.includes("합계")) {
+                total = remV;
+            } else if (org && org !== "조직") {
+                // BP팀 (Evan) 전체 행과 셀 행 모두를 포함하도록 조건 완화
+                if (org === cell || cell === "" || cell === "-") {
+                    remLab.push(org);
+                    remVal.push(remV);
+                } else {
+                    doneLab.push(cell);
+                    doneVal.push(doneV);
+                }
             }
         });
+        
         document.getElementById('totalTO').innerText = total + "명";
         updateChart('toRemainChart', 'bar', remLab, [{ label: '잔여 T.O', data: remVal, backgroundColor: '#E6221A' }], { indexAxis: 'y', scales: { x: intAxis } });
         document.getElementById('doneContainer').style.height = Math.max(350, doneLab.length * 30) + "px";
@@ -159,13 +137,9 @@
 
     function updateChart(id, type, labels, datasets, extraOpts = {}) {
         if(charts[id]) charts[id].destroy();
-        charts[id] = new Chart(document.getElementById(id), {
-            type: type, data: { labels: labels, datasets: datasets },
-            options: { maintainAspectRatio: false, responsive: true, ...extraOpts }
-        });
+        charts[id] = new Chart(document.getElementById(id), { type: type, data: { labels: labels, datasets: datasets }, options: { maintainAspectRatio: false, responsive: true, ...extraOpts } });
     }
     init();
 </script>
 </body>
 </html>
-
