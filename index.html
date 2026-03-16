@@ -1,48 +1,127 @@
-/**
- * SK일렉링크 채용 대시보드 API
- * 제작: Gemini
- */
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SK일렉링크 채용 전략 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --sk-red: #E6221A; --sk-orange: #F37021; --sk-gray: #53565A; --sk-purple: #7B42FF; --sk-light-gray: #f0f2f5; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--sk-light-gray); margin: 0; padding: 20px; }
+        .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 1rem; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .metric-card { background: white; padding: 15px; border-radius: 12px; text-align: center; border-bottom: 5px solid var(--sk-red); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .metric-value { font-size: 1.6rem; font-weight: bold; color: var(--sk-red); margin: 5px 0; }
+        .metric-sub { font-size: 0.7rem; color: #888; display: block; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .full-width { grid-column: 1 / -1; }
+        .chart-container { position: relative; min-height: 350px; width: 100%; }
+        h2 { font-size: 1rem; margin-top: 0; color: #333; border-left: 4px solid var(--sk-red); padding-left: 10px; margin-bottom: 20px; }
+        .pos-list-full { list-style: none; padding: 0; margin: 0; }
+        .pos-item-full { background: #fff; padding: 12px 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 8px; display: flex; align-items: center; font-size: 0.95rem; }
+        .pos-item-full a { text-decoration: none; color: #0056b3; font-weight: 500; display: block; width: 100%; }
+        .pos-item-full::before { content: '🚀'; margin-right: 12px; }
+    </style>
+</head>
+<body>
+<div class="header"><h1>SK electlink Recruitment Dashboard</h1></div>
+<div class="metric-grid">
+    <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div></div>
+    <div class="metric-card"><h3>전략채용</h3><div class="metric-value">4건</div><div class="metric-sub">(CEO 직접 영입)</div></div>
+    <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div></div>
+    <div class="metric-card"><h3>최단 리드타임</h3><div id="minLeadTime" class="metric-value">-</div><div id="minLeadPos" class="metric-sub">-</div></div>
+    <div class="metric-card"><h3>최장 리드타임</h3><div id="maxLeadTime" class="metric-value">-</div><div id="maxLeadPos" class="metric-sub">-</div></div>
+    <div class="metric-card"><h3>업데이트 시점</h3><div id="updateTime" class="metric-value">-</div></div>
+</div>
+<div class="chart-grid">
+    <div class="card full-width"><h2>월별 채용 완료 추이</h2><div class="chart-container"><canvas id="monthlyChart"></canvas></div></div>
+    <div class="card"><h2>채용 완료 직군 구성</h2><div class="chart-container"><canvas id="categoryChart"></canvas></div></div>
+    <div class="card"><h2>고용 형태별 현황</h2><div class="chart-container"><canvas id="typeChart"></canvas></div></div>
+    <div class="card full-width"><h2>채용 사유별 현황</h2><div class="chart-container"><canvas id="reasonChart"></canvas></div></div>
+</div>
+<div class="card full-width"><h2>현재 진행 중인 포지션 명단</h2><div id="positionListFull" class="pos-list-full">데이터 로드 중...</div></div>
 
-function doGet() {
-  try {
-    const data = getAnalysisData();
-    return ContentService.createTextOutput(JSON.stringify(data))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (e) {
-    // 에러 발생 시 브라우저에서 확인할 수 있도록 메시지 반환
-    return ContentService.createTextOutput(JSON.stringify({ 
-      "error": e.toString(),
-      "debug": "시트 이름을 다시 확인하거나 ID 연결 상태를 확인하세요."
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
+<script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwdLKBtJLuvAjeVsqZQh3W3eMIwBnU4M09XeV1Ow4teTNZYUGG4GFRbUAR6Je_t7Zcp/exec";
 
-function getAnalysisData() {
-  // [필수 수정] 본인의 스프레드시트 URL에서 ID를 복사해 넣어주세요.
-  // 예: https://docs.google.com/spreadsheets/d/123456789.../edit 이라면 "123456789..." 가 ID입니다.
-  const SPREADSHEET_ID = 'https://docs.google.com/spreadsheets/d/1MG333XE24EUCGHOdVCk4ptWLp4uoGFNpEDIj-gpcqjg/edit?gid=867729802#gid=867729802'; 
-  
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  
-  // 시트 이름 설정 (공백 유무를 여기서 조절할 수 있습니다)
-  const POS_SHEET_NAME = '포지션현황'; 
-  const CAND_SHEET_NAME = '후보자현황';
-  
-  const posSheet = ss.getSheetByName(POS_SHEET_NAME);
-  const candSheet = ss.getSheetByName(CAND_SHEET_NAME);
-  
-  // 시트 존재 여부 체크
-  if (!posSheet) throw new Error("'" + POS_SHEET_NAME + "' 시트를 찾을 수 없습니다.");
-  if (!candSheet) throw new Error("'" + CAND_SHEET_NAME + "' 시트를 찾을 수 없습니다.");
+    let charts = {};
+    const intAxis = { ticks: { stepSize: 1, precision: 0 }, beginAtZero: true };
 
-  // 데이터 가져오기
-  const posData = posSheet.getDataRange().getValues();
-  const candData = candSheet.getDataRange().getValues();
+    async function init() {
+        try {
+            const res = await fetch(GAS_URL);
+            const json = await res.json();
+            if (json.status === "success") {
+                renderDashboard(json.positions);
+                document.getElementById('updateTime').innerText = new Date().toLocaleDateString();
+            }
+        } catch (e) {
+            document.getElementById('positionListFull').innerText = "데이터 연동 오류가 발생했습니다.";
+        }
+    }
 
-  return {
-    status: "success",
-    positions: posData,
-    candidates: candData,
-    timestamp: new Date().getTime()
-  };
-}
+    function renderDashboard(rows) {
+        const data = rows.slice(1);
+        const active = data.filter(r => r[4] === '진행중');
+        const done = data.filter(r => r[4] === '완료');
+
+        document.getElementById('openCount').innerText = active.length + "건";
+        document.getElementById('positionListFull').innerHTML = active.map(r => {
+            return `<div class="pos-item-full">${r[12] ? `<a href="${r[12]}" target="_blank">${r[0]}</a>` : `<span>${r[0]}</span>`}</div>`;
+        }).join('');
+
+        // 월별 추이 (자동 계산)
+        const months = {};
+        done.forEach(r => {
+            if (!r[6]) return;
+            const d = new Date(r[6]);
+            const key = `${String(d.getFullYear()).slice(-2)}년 ${d.getMonth() + 1}월`;
+            months[key] = (months[key] || 0) + 1;
+        });
+        const mLabels = Object.keys(months).sort();
+        updateChart('monthlyChart', 'bar', mLabels, [{ label: '완료 인원', data: mLabels.map(l => months[l]), backgroundColor: '#E6221A' }], { scales: { y: intAxis } });
+
+        // 리드타임
+        let lt = done.map(r => {
+            const s = new Date(r[5]), e = new Date(r[6]);
+            return { title: r[0], days: Math.round((e-s)/86400000) };
+        }).filter(v => !isNaN(v.days) && v.days >= 0).sort((a,b) => a.days - b.days);
+
+        if(lt.length > 0) {
+            document.getElementById('avgLeadTime').innerText = Math.round(lt.reduce((a,b)=>a+b.days,0)/lt.length) + "일";
+            document.getElementById('minLeadTime').innerText = lt[0].days + "일";
+            document.getElementById('minLeadPos').innerText = lt[0].title;
+            document.getElementById('maxLeadTime').innerText = lt[lt.length-1].days + "일";
+            document.getElementById('maxLeadPos').innerText = lt[lt.length-1].title;
+        }
+
+        // 직군 구성
+        const cats = {};
+        done.forEach(r => { if(r[11]) cats[r[11]] = (cats[r[11]] || 0) + 1; });
+        updateChart('categoryChart', 'doughnut', Object.keys(cats), [{ data: Object.values(cats), backgroundColor: ['#E6221A', '#7B42FF', '#F37021', '#53565A', '#00C73C'] }]);
+
+        // 고용형태
+        const types = ['정규직', '계약직', '파견직'];
+        updateChart('typeChart', 'bar', types, [
+            { label: '진행', data: types.map(t => active.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#E6221A' },
+            { label: '완료', data: types.map(t => done.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#53565A' }
+        ], { scales: { x: {stacked:true}, y: {stacked:true, ...intAxis} } });
+
+        // 채용사유
+        const reasons = ['신규 채용', '대체 채용'];
+        updateChart('reasonChart', 'bar', reasons, [
+            { label: '진행', data: reasons.map(s => active.filter(r => String(r[8]).includes(s)).length), backgroundColor: '#F37021' },
+            { label: '완료', data: reasons.map(s => done.filter(r => String(r[8]).includes(s)).length), backgroundColor: '#53565A' }
+        ], { scales: { x: {stacked:true}, y: {stacked:true, ...intAxis} } });
+    }
+
+    function updateChart(id, type, labels, datasets, opts = {}) {
+        if(charts[id]) charts[id].destroy();
+        charts[id] = new Chart(document.getElementById(id), { type, data: { labels, datasets }, options: { maintainAspectRatio: false, ...opts } });
+    }
+    init();
+</script>
+</body>
+</html>
