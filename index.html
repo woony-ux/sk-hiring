@@ -64,26 +64,40 @@
 
     function renderDashboard(rows) {
         const data = rows.slice(1);
-        const active = data.filter(r => r[4] === '진행중');
-        const done = data.filter(r => r[4] === '완료');
+        const active = data.filter(r => String(r[4]).trim() === '진행중');
+        const done = data.filter(r => String(r[4]).trim() === '완료');
 
         document.getElementById('openCount').innerText = active.length + "건";
         document.getElementById('positionListFull').innerHTML = active.map(r => {
             return `<div class="pos-item-full">${r[12] ? `<a href="${r[12]}" target="_blank">${r[0]}</a>` : `<span>${r[0]}</span>`}</div>`;
         }).join('');
 
-        // 월별 추이 (자동 계산)
+        // 1. 월별 추이 (NaN 제거 및 날짜순 정렬)
         const months = {};
         done.forEach(r => {
-            if (!r[6]) return;
+            if (!r[6]) return; 
             const d = new Date(r[6]);
-            const key = `${String(d.getFullYear()).slice(-2)}년 ${d.getMonth() + 1}월`;
+            if (isNaN(d.getTime())) return; 
+
+            // 정렬을 위해 YYYY-MM 형식으로 키 저장
+            const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
             months[key] = (months[key] || 0) + 1;
         });
-        const mLabels = Object.keys(months).sort();
-        updateChart('monthlyChart', 'bar', mLabels, [{ label: '완료 인원', data: mLabels.map(l => months[l]), backgroundColor: '#E6221A' }], { scales: { y: intAxis } });
 
-        // 리드타임
+        const sortedKeys = Object.keys(months).sort();
+        const mLabels = sortedKeys.map(k => {
+            const parts = k.split('-');
+            return parts[0].slice(-2) + "년 " + parseInt(parts[1]) + "월";
+        });
+        const mValues = sortedKeys.map(k => months[k]);
+
+        updateChart('monthlyChart', 'bar', mLabels, [{ 
+            label: '완료 인원', 
+            data: mValues, 
+            backgroundColor: '#E6221A' 
+        }], { scales: { y: intAxis } });
+
+        // 2. 리드타임
         let lt = done.map(r => {
             const s = new Date(r[5]), e = new Date(r[6]);
             return { title: r[0], days: Math.round((e-s)/86400000) };
@@ -97,19 +111,19 @@
             document.getElementById('maxLeadPos').innerText = lt[lt.length-1].title;
         }
 
-        // 직군 구성
+        // 3. 직군 구성
         const cats = {};
-        done.forEach(r => { if(r[11]) cats[r[11]] = (cats[r[11]] || 0) + 1; });
+        done.forEach(r => { if(r[11]) { const c = String(r[11]).trim(); cats[c] = (cats[c] || 0) + 1; } });
         updateChart('categoryChart', 'doughnut', Object.keys(cats), [{ data: Object.values(cats), backgroundColor: ['#E6221A', '#7B42FF', '#F37021', '#53565A', '#00C73C'] }]);
 
-        // 고용형태
+        // 4. 고용형태
         const types = ['정규직', '계약직', '파견직'];
         updateChart('typeChart', 'bar', types, [
             { label: '진행', data: types.map(t => active.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#E6221A' },
             { label: '완료', data: types.map(t => done.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#53565A' }
         ], { scales: { x: {stacked:true}, y: {stacked:true, ...intAxis} } });
 
-        // 채용사유
+        // 5. 채용사유
         const reasons = ['신규 채용', '대체 채용'];
         updateChart('reasonChart', 'bar', reasons, [
             { label: '진행', data: reasons.map(s => active.filter(r => String(r[8]).includes(s)).length), backgroundColor: '#F37021' },
