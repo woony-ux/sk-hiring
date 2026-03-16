@@ -7,37 +7,44 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root { --sk-red: #E6221A; --sk-orange: #F37021; --sk-gray: #53565A; --sk-light-gray: #f4f6f9; }
-        * { box-sizing: border-box; -webkit-box-sizing: border-box; }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--sk-light-gray); margin: 0; padding: 15px; overflow-x: hidden; }
+        :root { --sk-red: #E6221A; --sk-orange: #F37021; --sk-gray: #53565A; --sk-light-gray: #f0f2f5; }
         
-        .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 25px; border-radius: 15px; margin-bottom: 20px; text-align: center; }
-        .header h1 { margin: 0; font-size: 1.6rem; }
-
-        /* 상단 지표 영역 */
-        .metric-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-        .metric-card { background: white; flex: 1; min-width: 140px; padding: 15px; border-radius: 12px; text-align: center; border-bottom: 4px solid var(--sk-red); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .metric-card h3 { margin: 0; font-size: 0.85rem; color: #666; }
-        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--sk-red); margin: 5px 0; }
-        .metric-sub { font-size: 0.7rem; color: #999; }
-
-        /* 차트 영역 레이아웃 */
-        .chart-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
-        .chart-card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); flex: 1; min-width: calc(50% - 10px); }
-        .full-card { min-width: 100%; }
+        /* 레이아웃 초기화 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--sk-light-gray); padding: 20px; color: #333; line-height: 1.5; }
         
-        h2 { font-size: 1rem; margin: 0 0 20px 0; color: #333; border-left: 4px solid var(--sk-red); padding-left: 10px; }
-        .chart-wrapper { position: relative; height: 320px; width: 100%; }
+        /* 헤더 고정 */
+        .header { background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); color: white; padding: 25px; border-radius: 12px; margin-bottom: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 1.6rem; margin: 0; }
 
-        /* 리스트 영역 */
-        .list-card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
-        .pos-item { background: #fdfdfd; padding: 12px 15px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 8px; font-size: 0.9rem; display: flex; align-items: center; }
-        .pos-item a { color: #0056b3; text-decoration: none; font-weight: bold; flex: 1; }
+        /* 지표 그리드 - 고정 높이 */
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .metric-card { background: white; padding: 18px; border-radius: 12px; text-align: center; border-bottom: 4px solid var(--sk-red); box-shadow: 0 2px 6px rgba(0,0,0,0.05); height: 110px; display: flex; flex-direction: column; justify-content: center; }
+        .metric-card h3 { font-size: 0.85rem; color: #666; margin-bottom: 5px; }
+        .metric-value { font-size: 1.6rem; font-weight: bold; color: var(--sk-red); }
+        .metric-sub { font-size: 0.7rem; color: #999; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* 메인 차트 그리드 */
+        .main-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); width: 100%; }
+        .full-width { grid-column: 1 / -1; }
+
+        h2 { font-size: 1rem; margin-bottom: 20px; color: #333; border-left: 5px solid var(--sk-red); padding-left: 10px; height: 1.2rem; display: flex; align-items: center; }
+        
+        /* 차트 크기 강제 고정 */
+        .chart-box { position: relative; height: 320px; width: 100%; }
+
+        /* 리스트 스타일 */
+        .pos-list { display: flex; flex-direction: column; gap: 8px; }
+        .pos-item { background: #f9f9f9; padding: 12px 15px; border-radius: 8px; border: 1px solid #eee; display: flex; align-items: center; font-size: 0.9rem; }
+        .pos-item a { color: #0056b3; text-decoration: none; font-weight: bold; }
         .pos-item::before { content: '🚀'; margin-right: 10px; }
 
-        @media (max-width: 768px) {
-            .chart-card { min-width: 100%; }
-            .header h1 { font-size: 1.2rem; }
+        /* 반응형 */
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.3rem; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
@@ -46,56 +53,53 @@
 <div class="header"><h1>SK electlink Recruitment Dashboard</h1></div>
 
 <div class="metric-grid">
-    <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div><div class="metric-sub">전체 진행수</div></div>
-    <div class="metric-card"><h3>전략채용</h3><div class="metric-value">4건</div><div class="metric-sub">CEO 영입</div></div>
-    <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div><div id="metric-sub-lt" class="metric-sub">분석중</div></div>
-    <div class="metric-card"><h3>최신 업데이트</h3><div id="updateTime" class="metric-value">-</div><div class="metric-sub">Real-time</div></div>
+    <div class="metric-card"><h3>진행중 공고</h3><div id="openCount" class="metric-value">-</div><div class="metric-sub">현재 채용중</div></div>
+    <div class="metric-card"><h3>전략채용</h3><div class="metric-value">4건</div><div class="metric-sub">CEO 직접 영입</div></div>
+    <div class="metric-card"><h3>평균 리드타임</h3><div id="avgLeadTime" class="metric-value">-</div><div id="metric-sub-lt" class="metric-sub">오픈~합격</div></div>
+    <div class="metric-card"><h3>데이터 기준일</h3><div id="updateTime" class="metric-value">-</div><div class="metric-sub">Real-time Data</div></div>
 </div>
 
-<div class="chart-row">
-    <div class="chart-card full-card">
+<div class="main-grid">
+    <div class="card full-width">
         <h2>월별 채용 완료 추이</h2>
-        <div class="chart-wrapper"><canvas id="monthlyChart"></canvas></div>
+        <div class="chart-box"><canvas id="monthlyChart"></canvas></div>
     </div>
-</div>
-
-<div class="chart-row">
-    <div class="chart-card">
+    
+    <div class="card">
         <h2>직군별 구성 (완료)</h2>
-        <div class="chart-wrapper"><canvas id="categoryChart"></canvas></div>
+        <div class="chart-box"><canvas id="categoryChart"></canvas></div>
     </div>
-    <div class="chart-card">
-        <h2>고용 형태별 (진행/완료)</h2>
-        <div class="chart-wrapper"><canvas id="typeChart"></canvas></div>
-    </div>
-</div>
 
-<div class="chart-row">
-    <div class="chart-card full-card">
+    <div class="card">
+        <h2>고용 형태별 현황</h2>
+        <div class="chart-box"><canvas id="typeChart"></canvas></div>
+    </div>
+
+    <div class="card full-width">
         <h2>채용 사유별 현황</h2>
-        <div class="chart-wrapper"><canvas id="reasonChart"></canvas></div>
+        <div class="chart-box"><canvas id="reasonChart"></canvas></div>
     </div>
-</div>
 
-<div class="list-card">
-    <h2>현재 진행 중인 포지션 명단</h2>
-    <div id="positionListFull">데이터를 불러오는 중...</div>
+    <div class="card full-width">
+        <h2>현재 진행 중인 포지션 명단</h2>
+        <div id="positionListFull" class="pos-list">데이터를 불러오는 중...</div>
+    </div>
 </div>
 
 <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwdLKBtJLuvAjeVsqZQh3W3eMIwBnU4M09XeV1Ow4teTNZYUGG4GFRbUAR6Je_t7Zcp/exec";
     let charts = {};
 
-    async function loadData() {
+    async function init() {
         try {
-            const response = await fetch(GAS_URL);
-            const res = await response.json();
-            if (res.status === "success") {
-                render(res.positions);
+            const res = await fetch(GAS_URL);
+            const json = await res.json();
+            if (json.status === "success") {
+                render(json.positions);
                 document.getElementById('updateTime').innerText = "26.03.16";
             }
         } catch (e) {
-            document.getElementById('positionListFull').innerText = "데이터 로드 오류: " + e;
+            document.getElementById('positionListFull').innerText = "데이터 연동 실패";
         }
     }
 
@@ -104,73 +108,62 @@
         const active = data.filter(r => String(r[4]).trim() === '진행중');
         const done = data.filter(r => String(r[4]).trim() === '완료');
 
-        // 상단 수치
         document.getElementById('openCount').innerText = active.length + "건";
-
-        // 리스트
         document.getElementById('positionListFull').innerHTML = active.map(r => `
             <div class="pos-item">
                 ${r[12] ? `<a href="${r[12]}" target="_blank">${r[0]}</a>` : `<span>${r[0]}</span>`}
             </div>
         `).join('');
 
-        // 1. 월별 추이 (NaN 방지)
-        const monthMap = {};
+        // 1. 월별 추이
+        const mObj = {};
         done.forEach(r => {
             if(!r[6]) return;
             const d = new Date(r[6]);
-            if(isNaN(d.getTime())) return;
-            const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
-            monthMap[key] = (monthMap[key] || 0) + 1;
+            if(isNaN(d)) return;
+            const k = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,'0');
+            mObj[k] = (mObj[k] || 0) + 1;
         });
-        const sortedMonths = Object.keys(monthMap).sort();
-        const mLabels = sortedMonths.map(k => k.split('-')[0].slice(-2) + "년 " + parseInt(k.split('-')[1]) + "월");
-        makeChart('monthlyChart', 'bar', mLabels, [{ label: '완료', data: sortedMonths.map(k => monthMap[k]), backgroundColor: '#E6221A' }]);
+        const sortedK = Object.keys(mObj).sort();
+        draw('monthlyChart', 'bar', sortedK.map(k=>k.split('-')[0].slice(-2)+'년 '+parseInt(k.split('-')[1])+'월'), 
+            [{ label: '인원', data: sortedK.map(k=>mObj[k]), backgroundColor: '#E6221A' }]);
 
         // 2. 리드타임
-        const lt = done.map(r => {
-            const s = new Date(r[5]), e = new Date(r[6]);
-            return (e - s) / 86400000;
-        }).filter(v => !isNaN(v) && v >= 0);
-        if(lt.length > 0) {
-            document.getElementById('avgLeadTime').innerText = Math.round(lt.reduce((a,b)=>a+b,0)/lt.length) + "일";
-        }
+        const lt = done.map(r => (new Date(r[6]) - new Date(r[5]))/86400000).filter(v => !isNaN(v) && v >= 0);
+        if(lt.length > 0) document.getElementById('avgLeadTime').innerText = Math.round(lt.reduce((a,b)=>a+b,0)/lt.length) + "일";
 
         // 3. 직군
         const cats = {};
         done.forEach(r => { if(r[11]) cats[r[11]] = (cats[r[11]] || 0) + 1; });
-        makeChart('categoryChart', 'doughnut', Object.keys(cats), [{ data: Object.values(cats), backgroundColor: ['#E6221A', '#F37021', '#7B42FF', '#53565A', '#FFB400'] }]);
+        draw('categoryChart', 'doughnut', Object.keys(cats), [{ data: Object.values(cats), backgroundColor: ['#E6221A','#F37021','#7B42FF','#53565A','#FFB400'] }]);
 
         // 4. 고용형태
         const types = ['정규직', '계약직', '파견직'];
-        makeChart('typeChart', 'bar', types, [
-            { label: '진행', data: types.map(t => active.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#E6221A' },
-            { label: '완료', data: types.map(t => done.filter(r => String(r[7]).includes(t)).length), backgroundColor: '#53565A' }
+        draw('typeChart', 'bar', types, [
+            { label: '진행', data: types.map(t=>active.filter(r=>String(r[7]).includes(t)).length), backgroundColor: '#E6221A' },
+            { label: '완료', data: types.map(t=>done.filter(r=>String(r[7]).includes(t)).length), backgroundColor: '#53565A' }
         ], true);
 
         // 5. 채용사유
         const reasons = ['신규 채용', '대체 채용'];
-        makeChart('reasonChart', 'bar', reasons, [
-            { label: '진행', data: reasons.map(s => active.filter(r => String(r[8]).includes(s)).length), backgroundColor: '#F37021' },
-            { label: '완료', data: reasons.map(s => done.filter(r => String(r[8]).includes(s)).length), backgroundColor: '#53565A' }
+        draw('reasonChart', 'bar', reasons, [
+            { label: '진행', data: reasons.map(s=>active.filter(r=>String(r[8]).includes(s)).length), backgroundColor: '#F37021' },
+            { label: '완료', data: reasons.map(s=>done.filter(r=>String(r[8]).includes(s)).length), backgroundColor: '#53565A' }
         ], true);
     }
 
-    function makeChart(id, type, labels, datasets, stacked = false) {
+    function draw(id, type, labels, datasets, stack = false) {
         if(charts[id]) charts[id].destroy();
         charts[id] = new Chart(document.getElementById(id), {
-            type: type,
-            data: { labels, datasets },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
-                scales: stacked ? { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } : { y: { beginAtZero: true } }
+            type, data: { labels, datasets },
+            options: { 
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                scales: { y: { beginAtZero: true, stacked: stack }, x: { stacked: stack } }
             }
         });
     }
-
-    window.addEventListener('load', loadData);
+    window.onload = init;
 </script>
 </body>
 </html>
