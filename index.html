@@ -2,7 +2,6 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SK electlink Recruitment Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
@@ -15,13 +14,10 @@
         .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; border-bottom: 4px solid var(--sk-red); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
         .metric-value { font-size: 1.8rem; font-weight: bold; color: var(--sk-red); }
         .main-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); min-height: 350px; }
         .full-width { grid-column: 1 / -1; }
         h2 { font-size: 1.1rem; margin-bottom: 20px; border-left: 5px solid var(--sk-red); padding-left: 10px; }
         .chart-box { position: relative; height: 300px; width: 100%; }
-        .pos-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
-        .pos-item { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .tag { font-size: 0.7rem; padding: 3px 8px; border-radius: 4px; background: #eee; }
         @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -37,15 +33,12 @@
 
 <div class="main-grid">
     <div class="card full-width"><h2>월별 채용 완료 추이</h2><div class="chart-box"><canvas id="monthlyChart"></canvas></div></div>
-    <div class="card"><h2>팀별 채용 현황 (진행중)</h2><div class="chart-box"><canvas id="teamChart"></canvas></div></div>
-    <div class="card"><h2>고용 형태 / 사유</h2><div class="chart-box"><canvas id="ratioChart"></canvas></div></div>
-    <div class="card full-width"><h2>현재 진행 중인 포지션 명단</h2><div id="positionListFull" class="pos-list">데이터 로딩 중...</div></div>
+    <div class="card"><h2>팀별 채용 비중 (진행중)</h2><div class="chart-box"><canvas id="teamChart"></canvas></div></div>
+    <div class="card"><h2>고용 형태 / 사유 (진행중)</h2><div class="chart-box"><canvas id="ratioChart"></canvas></div></div>
 </div>
 
 <script>
-    // ⚠️ [중요] Step 1에서 복사한 배포 URL을 아래 따옴표 안에 넣으세요.
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwiIPeRHxc6tu3ZU_7KrzkKxNjmKGnsFKk8Dj5qv7kv60OcxNsldyg1WFo4rHE-LuIfaA/exec"; 
-    let charts = {};
+    const GAS_URL = "여기에_앱스스크립트_배포_URL을_넣으세요"; 
 
     async function fetchData() {
         try {
@@ -56,54 +49,51 @@
     }
 
     function render(rows) {
+        if (!rows || rows.length < 2) return;
         const data = rows.slice(1);
+
+        // 담당자님 시트 열 순서 고정: 0:공고명, 1:팀, 4:상태, 5:오픈일, 6:합격일, 7:고용형태, 8:채용사유
         const active = data.filter(r => String(r[4] || '').trim() === '진행중');
         const completed = data.filter(r => String(r[4] || '').trim() === '완료');
 
         document.getElementById('openCount').innerText = active.length + "건";
         document.getElementById('updateTime').innerText = new Date().toLocaleTimeString();
         
-        // 리드타임 (오픈일 r[5], 합격일 r[6])
+        // 리드타임 (합격일 r[6] - 오픈일 r[5])
         const lts = completed.map(r => (new Date(r[6]) - new Date(r[5])) / 86400000).filter(v => v >= 0);
         document.getElementById('avgLeadTime').innerText = (lts.length ? Math.round(lts.reduce((a,b)=>a+b,0)/lts.length) : 0) + "일";
 
-        // 차트: 월별 추이 (합격일 기준)
+        // 1. 월별 추이 (완료 건 기준)
         const monthMap = {};
         completed.forEach(r => { if(r[6]) { const k = new Date(r[6]).toISOString().slice(0,7); monthMap[k] = (monthMap[k]||0)+1; }});
         const ks = Object.keys(monthMap).sort();
-        draw('monthlyChart', 'line', ks, [{label:'채용완료', data:ks.map(k=>monthMap[k]), borderColor:'#E6221A', fill:true, tension:0.3}]);
+        drawChart('monthlyChart', 'line', ks, [{label:'완료건수', data:ks.map(k=>monthMap[k]), borderColor:'#E6221A', fill:true}]);
 
-        // 차트: 팀별 (진행중 공고 소속 r[1])
+        // 2. 팀별 현황 (진행중 소속팀 r[1])
         const teamMap = {};
         active.forEach(r => { if(r[1]) teamMap[r[1]] = (teamMap[r[1]]||0)+1; });
-        draw('teamChart', 'doughnut', Object.keys(teamMap), [{data:Object.values(teamMap), backgroundColor:['#E6221A','#F37021','#FFB400','#53565A','#7B42FF']}]);
+        drawChart('teamChart', 'doughnut', Object.keys(teamMap), [{data:Object.values(teamMap), backgroundColor:['#E6221A','#F37021','#FFB400','#53565A','#7B42FF']}]);
 
-        // 차트: 형태/사유 비율 (고용형태 r[7], 사유 r[8])
+        // 3. 고용 형태 및 사유 (진행중 r[7], r[8])
         const p = active.filter(r => String(r[7]).includes('정규직')).length;
         const c = active.filter(r => String(r[7]).includes('계약직')).length;
         const n = active.filter(r => String(r[8]).includes('신규')).length;
         const r_sub = active.filter(r => String(r[8]).includes('대체')).length;
-        draw('ratioChart', 'bar', ['정규직','계약직','신규채용','대체채용'], [{label:'건수', data:[p,c,n,r_sub], backgroundColor:['#53565A','#53565A','#F37021','#F37021']}]);
-
-        // 진행중 리스트
-        document.getElementById('positionListFull').innerHTML = active.map(r => `
-            <div class="pos-item">
-                <strong>${r[0]}</strong>
-                <span class="tag">${r[1]}</span>
-            </div>
-        `).join('') || "진행 중인 공고가 없습니다.";
+        drawChart('ratioChart', 'bar', ['정규직','계약직','신규채용','대체채용'], [{label:'진행중 건수', data:[p,c,n,r_sub], backgroundColor:['#53565A','#53565A','#F37021','#F37021']}]);
     }
 
-    function draw(id, type, labels, datasets) {
-        if(charts[id]) charts[id].destroy();
-        charts[id] = new Chart(document.getElementById(id), {
+    function drawChart(id, type, labels, datasets) {
+        if(window.charts && window.charts[id]) window.charts[id].destroy();
+        if(!window.charts) window.charts = {};
+        const ctx = document.getElementById(id).getContext('2d');
+        window.charts[id] = new Chart(ctx, {
             type, data: {labels, datasets},
             options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
         });
     }
 
     fetchData();
-    setInterval(fetchData, 60000); // 1분마다 자동 갱신
+    setInterval(fetchData, 60000);
 </script>
 </body>
 </html>
